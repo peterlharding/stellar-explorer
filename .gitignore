@@ -218,3 +218,32 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---------------------------------------------------------------------------
+# Stellar Explorer
+# ---------------------------------------------------------------------------
+
+# Downloaded catalogues and built databases: large, rebuilt by the pipeline,
+# and carrying their own licence terms. See RELEASING.md, "Content safety".
+data/
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# Private scenarios: fiction content that must not be published.
+scenarios/private/
+
+# Godot: the import cache and editor state are rebuilt locally.
+# (*.import files and export_presets.cfg ARE committed.)
+.godot/
+
+# Apple signing material.
+*.p8
+*.p12
+*.mobileprovision
+*.provisionprofile
+
+# macOS
+.DS_Store
