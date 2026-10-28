@@ -1,6 +1,6 @@
 # Stellar Explorer documentation
 
-All project documentation lives in this directory. The repository root keeps only `README.md`, `RELEASING.md`, `CHANGELOG.md`, `VERSION` and `LICENSE`.
+All project documentation lives in this directory. The repository root keeps only `README.md`, `RELEASING.md`, `CHANGELOG.md`, `VERSION` and `LICENSE`. Drafts of issues for other projects live in [../issues/](../issues/README.md).
 
 | Document | What it covers |
 | --- | --- |

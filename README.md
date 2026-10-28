@@ -33,6 +33,7 @@ How the documents relate: the design is in `ARCHITECTURE.md`, intentions and ope
 | `src/` | Still to come: `src/core/` (C++ core library), `src/app/` (Godot project) |
 | `scripts/` | Repository tooling: documentation link check, version fields |
 | `data/` | Downloaded catalogues and the built `catalogue.sqlite`; git-ignored |
+| `issues/` | Drafts of issues to report to other projects, such as errors found in source catalogues |
 | `release_notes/` | One user-facing file per release |
 | `RELEASING.md` | The release process and commit conventions |
 | `CHANGELOG.md` | What changed in each release |
