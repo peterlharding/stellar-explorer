@@ -3,7 +3,7 @@
 This document describes the release process for Stellar Explorer.
 Follow these steps for every release so that the version number, changelog, release notes, and git tag stay in sync.
 
-Nothing has been released yet: `VERSION` is `0.0.0` and the repository holds documentation only. Steps that depend on tooling the project does not have yet are marked *planned*, and [Not yet in place](#not-yet-in-place) lists what is missing. Update this file in the same change that adds each piece.
+Nothing has been released yet: `VERSION` is `0.0.0` and the only code is the catalogue pipeline. Steps that depend on tooling the project does not have yet are marked *planned*, and [Not yet in place](#not-yet-in-place) lists what is missing. Update this file in the same change that adds each piece.
 
 ## Versioning
 
@@ -36,33 +36,31 @@ Until `1.0.0` the database schema, the core interface and the tour and scenario 
 
 ## Where versions live
 
-Today the version string lives in four places:
+Today the version string lives in five places:
 
 - `VERSION` at the repo root, which is **canonical**.
+- `version` in `src/pipeline/pyproject.toml` (and, through it, `src/pipeline/uv.lock`).
 - `CHANGELOG.md` at the repo root, following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `release_notes/v<version>.md`, one user-facing file per release.
 - The git tag `v<version>` (annotated).
 
 As components land, each gains a version field that has no reason to agree with the others unless something makes it:
 
-- `version` in `src/pipeline/pyproject.toml`.
 - The core library's build file: `project(... VERSION ...)` in `src/core/CMakeLists.txt` (the core is C++, [ADR 0008](docs/decisions/0008-core-in-cpp.md)).
 - `config/version` in `src/app/project.godot`, and the bundle version fields in the Godot export presets for macOS and visionOS.
 
-*Planned:* when the second of these appears, add `scripts/version.py` to write them together and a `make version-check` target that fails on drift. From then on, do not edit version fields by hand.
+`scripts/version.py` writes them together and `make version-check` (part of `make check`) fails on drift. Do not edit version fields by hand; add each new one to `FIELDS` in `scripts/version.py`.
 
 ## Release steps
 
 1. **Pick the version number** based on the nature of the changes (see Versioning above).
 
-2. **Bump the version.** Today that is one file:
+2. **Bump the version** everywhere at once:
 
    ```sh
-   echo "<version>" > VERSION
-   git diff   # expect only VERSION to change
+   make version-set VERSION=<version>
+   git diff   # expect VERSION, src/pipeline/pyproject.toml and src/pipeline/uv.lock
    ```
-
-   *Planned:* `make version-set VERSION=<version>`, once more than one file carries the version.
 
 3. **Cut the changelog.** In `CHANGELOG.md`:
    - Move the items under `## [Unreleased]` into a new `## [<version>] - YYYY-MM-DD` section (today's date).
@@ -74,12 +72,14 @@ As components land, each gains a version field that has no reason to agree with 
    See `release_notes/README.md` for the structure: a short intro, Highlights, any Fixed section, Data, and Under the hood.
    Write them for someone exploring with the app, not for developers.
 
-5. **Run every check** and confirm there are no warnings and no failures. As each component lands its checks join this list (*planned:* one `make check` that runs them all):
+5. **Run every check** and confirm there are no warnings and no failures. `make check` runs everything that exists so far; as each component lands its checks join it:
 
-   - Pipeline: `pytest`, with warnings treated as errors.
+   - Pipeline: `ruff` formatting and lint, `mypy --strict`, and `pytest` with warnings treated as errors.
+   - Catalogue: `make catalogue` then `make gate`, if the release touches the pipeline or its sources.
    - Core: the unit tests, including the fixed reference cases (known star distances, known relativistic travel times, known sky positions at a date).
    - Front end: the Godot project opens and exports for every target without errors or warnings.
-   - Documentation: links between the files in `docs/` resolve.
+   - Documentation: links between the Markdown files resolve, anchors included.
+   - Version fields agree with `VERSION`.
 
    Do not cut a release on a failing or flaky suite.
    Fix the test or the code first, even when the failure looks unrelated to what the release contains.
@@ -188,10 +188,8 @@ Check `git status` before every commit, and never force-add an ignored file.
 
 Each of these is added with the phase in [docs/PLAN.md](docs/PLAN.md#roadmap) that first needs it.
 
-- `scripts/version.py`, `make version-set` and `make version-check` (when a second file carries the version).
-- `make check`, running every suite in step 5 (with the first code, phase 1).
 - CI on push, and the wait-for-CI part of step 9 (phase 1 or 2).
-- The schema guard in the core and the `CORE_API_VERSION` check in the front end (phases 1 and 2).
+- The schema guard in the core and the `CORE_API_VERSION` check in the front end (phase 2). The pipeline already writes `SCHEMA_VERSION` into each catalogue.
 - Build artefacts and step 12 (phase 2 for desktop, phase 3 for the headsets).
 
 ## Notes

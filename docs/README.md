@@ -5,6 +5,7 @@ All project documentation lives in this directory. The repository root keeps onl
 | Document | What it covers |
 | --- | --- |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | The design: goals, prior art, stack recommendation, system architecture, data model, rendering, time and motion, analysis views, starships and relativity, tours and gamification, VR targets, sources |
+| [DATA-MODEL.md](DATA-MODEL.md) | The catalogue database: sources, what the pipeline does with each, preferred values, tables, querying, and the phase 1 gate |
 | [PLAN.md](PLAN.md) | The roadmap with phase gates, risks, what has been decided, and the open questions |
 | [decisions/](decisions/README.md) | Architecture decision records (ADRs), one per settled decision |
 

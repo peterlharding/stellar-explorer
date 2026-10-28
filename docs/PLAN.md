@@ -21,6 +21,8 @@ flowchart LR
 | 6 Tours and play | Tours, missions, discovery log | One complete narrated tour and one mission chain run on all three platforms |
 | 7 Scale-up | AT-HYG at 2.5 million stars, then a Gaia octree | 2.5 million stars hold headset frame rate; the octree design is proven on a Gaia sample |
 
+**Progress.** Phase 1's gate passes as of 25 October 2026: `make catalogue` builds the catalogue and `make gate` checks it (see [DATA-MODEL.md](DATA-MODEL.md#the-gate)).
+
 If the Vision Pro trial fails its gate, phases 4 to 7 continue on desktop and Vive while the Vision Pro front end is rebuilt as a native Metal shell over the same core.
 
 ## Risks
@@ -51,6 +53,7 @@ Each settled decision is an ADR in [decisions/](decisions/README.md).
 | [0008](decisions/0008-core-in-cpp.md) | The core library is written in C++ | 25 October 2026 |
 | [0009](decisions/0009-personal-tool.md) | A personal tool, not a public installation | 25 October 2026 |
 | [0010](decisions/0010-public-repository-private-scenarios.md) | A public repository, with book-based scenarios kept outside it | 25 October 2026 |
+| [0011](decisions/0011-astrometry-from-hipparcos.md) | Star astrometry from the Hipparcos New Reduction, not HYG | 25 October 2026 |
 
 ## Open questions
 

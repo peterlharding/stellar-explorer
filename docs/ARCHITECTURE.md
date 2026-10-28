@@ -132,10 +132,11 @@ Because the core has no engine dependency, it gets ordinary unit tests: known st
 | `src/app/` | Godot project |
 | `tours/` | Tour files |
 | `scenarios/` | A neutral example scenario; `scenarios/private/` is a separate private repository, git-ignored here |
+| `scripts/` | Repository tooling: documentation link check, version fields |
 | `data/` | Downloaded catalogues and built databases; git-ignored |
 | `release_notes/` | One user-facing file per release |
 
-Only `docs/`, `src/` and `release_notes/` exist so far; the rest appear with the phase that needs them.
+Only `docs/`, `src/pipeline/`, `scripts/` and `release_notes/` exist so far; the rest appear with the phase that needs them.
 
 ## Data and database
 
@@ -145,12 +146,15 @@ The catalogue is one SQLite file, built offline by a Python pipeline and opened 
 
 | Source | Content | Size | Notes |
 | --- | --- | --- | --- |
-| [HYG 4.2](https://astronexus.com/projects/hyg) | Hipparcos, Yale Bright Star and Gliese catalogues merged. Positions, proper motion, radial velocity, 3D coordinates and velocities, spectral type, colour index, luminosity | about 120,000 stars | The same lineage as the Chrome experiment. CC BY-SA 4.0 |
+| [HYG 4.4](https://codeberg.org/astronexus/hyg) | Hipparcos, Yale Bright Star and Gliese catalogues merged. Positions, proper motion, radial velocity, 3D coordinates and velocities, spectral type, colour index, luminosity | 119,614 stars | The same lineage as the Chrome experiment. Names, photometry and radial velocities come from here. CC BY-SA 4.0 |
+| [Hipparcos New Reduction](https://cdsarc.cds.unistra.fr/viz-bin/cat/I/311) | Positions, parallaxes and proper motions with uncertainties (van Leeuwen 2007) | 117,955 stars | Astrometry for the HYG stars it covers ([ADR 0011](decisions/0011-astrometry-from-hipparcos.md)) |
 | [AT-HYG 3.2](https://astronexus.com/projects/at-hyg) | Tycho-2 with Gaia distances and velocities | 2.55 million stars; subsets from 119,000 to 871,000 | First scale-up step, same field layout. CC BY-SA 4.0 |
-| [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/) | Confirmed planets and host stars, via the [TAP service](https://exoplanetarchive.ipac.caltech.edu/docs/TAP/usingTAP.html) tables `ps` and `pscomppars` | 6,375 confirmed planets on 1 October 2026 | Re-run the ingest to refresh |
+| [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/) | Confirmed planets and host stars, via the [TAP service](https://exoplanetarchive.ipac.caltech.edu/docs/TAP/usingTAP.html) tables `ps` and `pscomppars` | 6,451 confirmed planets on 25 October 2026 | Re-run the ingest to refresh |
 | [Gaia DR4](https://www.cosmos.esa.int/web/gaia/release) | Next Gaia release, 66 months of data | Due 2 December 2026 | Target for the later scale-up, not v1 |
 
 CC BY-SA 4.0 means a redistributed database derived from HYG must carry attribution and the same licence. The code is unaffected.
+
+The pipeline, the schema, the rules for choosing between sources, and what was found in the sources are in [DATA-MODEL.md](DATA-MODEL.md).
 
 ### Schema principles
 
@@ -309,7 +313,7 @@ Pages opened on 3 October 2026.
 - [Making 100,000 Stars](https://web.dev/case-studies/100000stars), web.dev case study
 - [Gaia Sky](https://gaiasky.space/) and its [VR documentation](https://gaia.ari.uni-heidelberg.de/gaiasky/docs/3.7.3/Gaia-sky-vr.html)
 - [OpenSpace](https://www.openspaceproject.com/)
-- [HYG database](https://astronexus.com/projects/hyg) and [AT-HYG database](https://astronexus.com/projects/at-hyg), Astronexus
+- [HYG database](https://astronexus.com/projects/hyg) and [AT-HYG database](https://astronexus.com/projects/at-hyg), Astronexus; HYG releases are now on [Codeberg](https://codeberg.org/astronexus/hyg) (checked 25 October 2026)
 - [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/) and its [TAP guide](https://exoplanetarchive.ipac.caltech.edu/docs/TAP/usingTAP.html)
 - [Gaia data release schedule](https://www.cosmos.esa.int/web/gaia/release), ESA
 - [Godot 4.5 release notes](https://godotengine.org/releases/4.5/) and [Godot large world coordinates](https://docs.godotengine.org/en/stable/tutorials/physics/large_world_coordinates.html)

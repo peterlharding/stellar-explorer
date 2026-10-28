@@ -43,3 +43,4 @@ What this makes easy, what it makes hard, and what would cause it to be revisite
 | [0008](0008-core-in-cpp.md) | The core library is written in C++ | Accepted |
 | [0009](0009-personal-tool.md) | A personal tool, not a public installation | Accepted |
 | [0010](0010-public-repository-private-scenarios.md) | A public repository, with book-based scenarios kept outside it | Accepted |
+| [0011](0011-astrometry-from-hipparcos.md) | Star astrometry from the Hipparcos New Reduction, not HYG | Accepted |

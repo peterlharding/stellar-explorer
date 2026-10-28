@@ -6,7 +6,7 @@ I would like to be able to concoct scenarios to replicate some of the trips imag
 
 ## Status
 
-Design stage. The repository holds documentation and the release process; there is no code yet, and `VERSION` is `0.0.0`. The first phase of the [plan](docs/PLAN.md#roadmap) is the data pipeline.
+Phase 1 of the [plan](docs/PLAN.md#roadmap), the data foundation, has passed its gate. The pipeline builds a SQLite catalogue of 123,550 stars and 6,451 exoplanets from HYG, the Hipparcos New Reduction and the NASA Exoplanet Archive, with a source on every value. Nothing has been released yet, and `VERSION` is `0.0.0`. Phase 2, the desktop app, is next.
 
 The intended shape: a native 3D and VR application for desktop, HTC Vive and Apple Vision Pro, built on a queryable catalogue of real stars and exoplanets, with a relativistic starship simulator, guided tours and an optional game layer on top.
 
@@ -17,6 +17,7 @@ All documentation lives in [`docs/`](docs/README.md). New documents go there, no
 | Document | What it covers |
 | --- | --- |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | The design: goals, stack recommendation, system architecture, data model, rendering, time and motion, starships and relativity, tours, VR targets |
+| [docs/DATA-MODEL.md](docs/DATA-MODEL.md) | The catalogue database: sources, how the pipeline treats them, tables, querying |
 | [docs/PLAN.md](docs/PLAN.md) | Roadmap with phase gates, risks, decisions made, and open questions |
 | [docs/decisions/](docs/decisions/README.md) | Architecture decision records, one per settled decision |
 | [docs/README.md](docs/README.md) | Index of the above and the documentation conventions |
@@ -28,11 +29,26 @@ How the documents relate: the design is in `ARCHITECTURE.md`, intentions and ope
 | Path | Holds |
 | --- | --- |
 | `docs/` | All documentation |
-| `src/` | Source code, to come: `src/pipeline/` (Python ingest), `src/core/` (core library), `src/app/` (Godot project) |
+| `src/pipeline/` | The Python ingest pipeline that builds the catalogue |
+| `src/` | Still to come: `src/core/` (C++ core library), `src/app/` (Godot project) |
+| `scripts/` | Repository tooling: documentation link check, version fields |
+| `data/` | Downloaded catalogues and the built `catalogue.sqlite`; git-ignored |
 | `release_notes/` | One user-facing file per release |
 | `RELEASING.md` | The release process and commit conventions |
 | `CHANGELOG.md` | What changed in each release |
 | `VERSION` | The canonical version number |
+
+## Building the catalogue
+
+You need [uv](https://docs.astral.sh/uv/) and `make`. From the repository root:
+
+```sh
+make catalogue   # download the sources (about 25 MB) and build data/catalogue.sqlite
+make gate        # check it against published positions and distances
+make check       # lint, type checks, unit tests, documentation links, version fields
+```
+
+The result opens in any SQLite tool; [docs/DATA-MODEL.md](docs/DATA-MODEL.md#querying) has example queries.
 
 ## Releasing
 
@@ -40,4 +56,4 @@ The process is in [RELEASING.md](RELEASING.md). In short: one semantic version f
 
 ## Licence
 
-The code is under the MIT licence; see [LICENSE](LICENSE). Catalogue data is not stored in this repository. The HYG and AT-HYG star catalogues are CC BY-SA 4.0, so any database built from them and redistributed carries that licence and their attribution.
+The code is under the MIT licence; see [LICENSE](LICENSE). Catalogue data is not stored in this repository, apart from small excerpts used as test fixtures (see `src/pipeline/tests/fixtures/README.md`). The HYG and AT-HYG star catalogues are CC BY-SA 4.0, so any database built from them and redistributed carries that licence and their attribution.
