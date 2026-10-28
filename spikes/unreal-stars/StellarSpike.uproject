@@ -1,0 +1,22 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "5.8",
+	"Category": "",
+	"Description": "Spike: can Unreal render the Stellar Explorer catalogue, on the desktop and in the headsets?",
+	"Modules": [
+		{
+			"Name": "StellarSpike",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{ "Name": "SQLiteCore", "Enabled": true },
+		{ "Name": "ProceduralMeshComponent", "Enabled": true },
+		{ "Name": "PythonScriptPlugin", "Enabled": true },
+		{ "Name": "EditorScriptingUtilities", "Enabled": true },
+		{ "Name": "OpenXR", "Enabled": true },
+		{ "Name": "OpenXRVisionOS", "Enabled": true },
+		{ "Name": "Fab", "Enabled": false }
+	]
+}
