@@ -13,6 +13,11 @@ class AStarField;
  *   -Autopilot          circle the Sun instead of taking input
  *   -LookAt=<ra>,<dec>  stand at the Sun facing RA (hours), Dec (degrees)
  *   -QuitAfter=<s>      log the frame times, take a screenshot and quit
+ *   -TestObject         put a lit cube 1 m in front of a headset's start, to tell
+ *                       "nothing renders" from "the stars do not show"
+ *   -SkySphere[=<pc>]   enclose the view in an opaque black sphere, by default
+ *                       beyond the furthest star; always done in a headset
+ *                       (see SpawnSkySphere)
  */
 UCLASS()
 class AStellarSpikeGameMode : public AGameModeBase
@@ -29,6 +34,14 @@ public:
 
 private:
 	void Finish();
+	void SpawnTestObject();
+	/**
+	 * The visionOS compositor shows only pixels with something opaque behind them: the
+	 * additive stars alone leave the sky black. An opaque black sphere beyond the furthest
+	 * star gives every pixel depth and full alpha without hiding any star.
+	 */
+	void SpawnSkySphere();
+	void LogCamera() const;
 
 	UPROPERTY()
 	TObjectPtr<AStarField> StarField;
@@ -37,6 +50,7 @@ private:
 	TOptional<FVector> LookAt;
 	double QuitAfter = 0.0;
 	double Elapsed = 0.0;
+	double NextCameraLog = 0.0;
 	bool bScreenshotRequested = false;
 	TArray<float> FrameTimes;
 };

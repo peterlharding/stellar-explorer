@@ -17,6 +17,7 @@
 		{ "Name": "EditorScriptingUtilities", "Enabled": true },
 		{ "Name": "OpenXR", "Enabled": true },
 		{ "Name": "OpenXRVisionOS", "Enabled": true },
+		{ "Name": "OpenXRHandTracking", "Enabled": true },
 		{ "Name": "Fab", "Enabled": false }
 	]
 }

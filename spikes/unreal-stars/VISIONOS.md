@@ -148,20 +148,79 @@ The headset was running a visionOS 27.2 beta; the Mac, macOS 27.0.1.
   Turning off AirPlay Receiver.
   Restarting Control Center (`killall ControlCenter`): it came back and put the shield straight up again, so the state lives elsewhere.
   Restarting the headset.
-- **Next.** Updating the headset to the visionOS 27.2 release candidate and the Mac to macOS 27.2, which restarts the Mac and should clear the shield.
+- **What didn't work either.** Updating the Mac to macOS 27.2 and restarting it: the Screen Mirroring icon in the menu bar was still highlighted afterwards, so the setting outlives a restart.
+  Stopping Mirror My View on the headset: it disconnected the headset's stream to the Mac but left the Dell blank.
+- **A wrong turn.** I took the blank Dell to be the Mac blanking its displays for Mac Virtual Display, the Mac's screen sent into the headset.
+  It was not the headset at all.
+- **The real cause.** A plain left-click on the menu-bar Screen Mirroring icon (a right-click only shows its menu-bar options) showed "Mirror or Extend to: DELL U3821DW", "Connected", with a black preview and a "Choose Content" button.
+  macOS had made the Dell itself the target of a Screen Mirroring session, as if it were an AirPlay television, with nothing chosen to show on it.
+  It fits `system_profiler` reporting the monitor, over DisplayPort, as "Television: Yes".
+  Apple Vision Pro was listed in the same panel as another target, not the active one.
+  The session came back after it had once been cleared, around when the headset came back online after its update.
+- **What worked.** "Choose Content", then Extend: the Dell became an ordinary extended display again.
+- **If it recurs.** Check System Settings → Displays → DELL U3821DW → Use as: Extended display.
 
-## Paused (29 October)
+## 12. Stars only near opaque objects: the compositor needs something behind them (29 October)
 
-Work stopped here to update both machines.
-On resuming:
+After both updates (macOS 27.2, visionOS 27.2), and without mirroring, the view was still black.
+Each step below separated the possible causes.
 
-1. Check the Dell U3821DW is a display again (`system_profiler SPDisplaysDataType` lists it).
-2. Check Xcode still works after the macOS update, and whether it wants an update or a new visionOS SDK; open it once so it can install its components.
-3. Reconnect the headset; Xcode may "prepare" it again for the new visionOS, which takes a few minutes.
-   Check `xcrun devicectl list devices` shows it `available (paired)`; if not, `xcrun devicectl manage pair --device 00008112-000A088C11C1A01E`.
-4. If the app is gone, `./spike.sh install 00008112-000A088C11C1A01E`; if the SDK changed, rebuild first with `./spike.sh visionos`.
-5. Launch it without mirroring and look for the Sun, a bright white blob about 1.5 m ahead.
-   If the view is still black, add a large bright test object a metre ahead to tell "nothing renders" from "the stars do not show".
+- **Is anything reaching the eyes?** A `-TestObject` option put a lit 20 cm cube 1 m ahead.
+  The cube was visible, so frames reach the display.
+  Stars showed only in rectangular patches around the cube, patches that moved with it as the head turned.
+  A camera log every two seconds showed head tracking working, though no tracking permission prompt appeared.
+- **What didn't work.** Turning off OpenXR's depth layer (`xr.OpenXRAllowDepthLayer=0`): the visionOS plugin fails a check in `FOXRVisionOSSession::XrEndFrame`, which requires depth for both eyes, and the app closes when it goes immersive.
+- **What didn't work.** MSAA off with the Vision Pro device profile's own `r.Mobile.XRMSAAMode=2`: no change.
+- **The decisive test.** Unreal can save the frame it renders, before the compositor sees it (`-QuitAfter` takes a screenshot; it lands in the app's `Documents/StellarSpike/Saved/Screenshots/IOS/`).
+  That frame had stars over the whole view.
+  So the stars were rendered and the compositor was dropping them.
+- **A test that tested nothing.** A black sky sphere made from the engine's sphere mesh, turned inside out with a negative scale, changed nothing in the headset, at 1,200 pc or at 20 pc.
+  Black on black, its absence was invisible; the screenshot showed it: as many stars as without it.
+  Unreal detects a negative scale and flips its culling to compensate, so the sphere still showed only its outside.
+- **What worked.** A sphere generated in code with each triangle in both windings, opaque, unlit and so black.
+  At 20 pc it hid every star beyond it, which the screenshot confirmed, and the headset showed the remaining stars all around.
+  At 1,200 pc, beyond the furthest star, it hides nothing, and the headset showed the whole sky.
+- **The cause.** The visionOS compositor shows only pixels with something opaque behind them.
+  Additive stars write no depth and leave the background's alpha and depth empty, and the compositor treats those pixels as empty, black in full immersion.
+  Near the cube there was opaque depth, which is why stars showed in patches there.
+  The app now always draws the sky sphere in a headset.
+- **Still to judge.** White arcs at the outer lower edges of each eye's view, which move as the head turns and vanish when looked at.
+  They are not in Unreal's frame, even brightened five stops; probably glare in the lenses from the bright Sun near the edge of the view.
+
+## 13. Tuning by eye, and what the launch options are for (29 October)
+
+Values that only a person in the headset can judge were made launch options, set by writing the app's `Documents/uecommandline.txt` with `devicectl device copy to`, so each try needs no rebuild:
+`-StarExposure=`, `-StarSize=`, `-LimitingMag=`, `-TestObject`, `-SkySphere=<pc>`, `-QuitAfter=<s>` (which saves Unreal's frame as a screenshot) and `-PointerTest`.
+
+- **Brightness.** The Mac's exposure (0.04) was too dim in the headset; 0.12 better, 0.25 right. The app now uses 0.25 in a headset.
+- **Blur.** The compositor hands Unreal 1888 × 1792 pixels per eye (`Resizing VR buffer to 3776 by 1792`), well under the panels' resolution, because the engine's SwiftUI code configures the compositor layer with foveation off (`isFoveationEnabled = false` in `SwiftMain.swift`).
+  `vr.PixelDensity=1.5` was accepted and changed nothing: the compositor sets the size.
+  Turning foveation on means changing precompiled engine code; not done.
+- **Faint stars fade when stared at.** Troxler fading, a property of human vision, not of the app.
+- **Hands.** visionOS showed the viewer's hands (`UpperLimbVisibility` automatic). Hidden with `UpperLimbVisibility=0` under `[/Script/VisionOSRuntimeSettings.VisionOSRuntimeSettings]` in `DefaultEngine.ini`, in favour of a pointer.
+- **A system control** of two concentric circles stays in view and is distracting. SwiftUI can hide some system overlays (`persistentSystemOverlays(.hidden)`), but the immersive space is declared in the engine's precompiled SwiftUI code. Not done.
+
+## 14. A pointer: point at a star and pinch to name it (29 October)
+
+- **What the plugin offers.** The OpenXR visionOS plugin defines an `/interaction_profiles/epic/visionos_controller` profile with a pinch (`select`) and aim and grip poses per hand.
+  But nothing registers that profile with Unreal's input system, and Unreal's OpenXR input only suggests bindings for profiles it knows (simple controller, Vive, Touch and the like), so the pinch reaches no input key.
+  Gaze is not offered at all; visionOS keeps it from apps.
+- **What worked.** Unreal's OpenXR hand-tracking plugin (`OpenXRHandTracking`), built for visionOS in the launcher engine, reading the runtime's `XR_EXT_hand_tracking`: every joint of both hands, in world space, needing no input bindings.
+  The ray runs from an estimated shoulder (15 cm below and 18 cm beside the head) through the index knuckle; a pinch is the thumb tip and index tip closer than 2.5 cm, ending when they part beyond 4 cm.
+  On the Mac the same code takes the view's centre and the left mouse button, so it can be checked with screenshots before it goes on the headset.
+- **A trap: untracked hands read as pinching.** The first build quit two seconds after starting, having selected two stars in its second frame.
+  `IHandTracker::GetKeypointState` returns the last joints it received even for a hand not being tracked, and before any, all joints at one point: a thumb-to-index gap of zero, a pinch, on both hands, which is also the exit gesture.
+  `GetAllKeypointStates` reports whether the hand is tracked; the pointer now uses that, and counts a pinch only after the hand has been seen open since tracking began.
+- **A trap: the engine's text is lit.** The label did not show. Its material, `DefaultTextMaterialOpaque`, is lit (`MSM_DEFAULT_LIT`, the text colour as base colour), and nothing lights this scene.
+  A material of my own that sampled the font gave solid blocks, not letters.
+  What worked: the material script copies the engine's text material and makes the copy unlit, with the text colour as emission, keeping Epic's handling of the font.
+- **A bug the pointer exposed.** `-LookAt` had put the camera 0.001 units behind the Sun, not in front as its comment said, so the Sun was dead ahead, hidden only by the near clipping plane; the pointer duly selected it. Fixed, and the pointer now ignores stars nearer than the near plane.
+- **From the first session in the headset.**
+  The rays followed the hands; selection worked but intermittently; a label for a star below the viewer was edge-on, because it turned only to face the viewer's direction horizontally; the rays were too bright; the two-handed exit worked.
+- **Changed for the next session.**
+  A pinch now selects what the ray pointed at 0.15 s before, since pinching moves the hand and the ray with it; and the log records each pinch's measured gap, for tuning the thresholds.
+  The label faces the viewer square on, below the star as seen from there.
+  The ray is a line of 18 small dim dots from 10 cm to 3 m, each the same apparent size.
 
 ## Harmless noise in the logs
 
@@ -172,5 +231,8 @@ On resuming:
 ## Still open
 
 - The visionOS build renders with the mobile renderer on `SF_METAL_ES3_1_IOS`, which supports neither instanced stereo nor multiview ("bIsMobileMultiViewEnabled=0"): each eye is drawn separately.
-- Frame rate, comfort and how the stars look in the headset.
-- Input: OpenXR warns that no interaction profiles are bound, so no input actions work yet.
+  Even so it holds about 95 frames a second with every star.
+- Sharpness: foveation is off in the engine's precompiled SwiftUI code (section 13).
+- The system's concentric-circle control in view (section 13).
+- White arcs at the outer lower edge of each eye, not in Unreal's frame; probably lens glare from the Sun.
+- The pointer's second round of changes (section 14), not yet tried in the headset.

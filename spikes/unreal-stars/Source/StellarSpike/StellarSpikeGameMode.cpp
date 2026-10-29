@@ -5,10 +5,18 @@
 #include "GameFramework/FloatingPawnMovement.h"
 #include "GameFramework/PlayerController.h"
 #include "Camera/PlayerCameraManager.h"
+#include "Components/PointLightComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/PointLight.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshActor.h"
 #include "HighResScreenshot.h"
 #include "IXRTrackingSystem.h"
+#include "Materials/MaterialInterface.h"
 #include "Misc/CommandLine.h"
+#include "ProceduralMeshComponent.h"
 #include "StarField.h"
+#include "StarPointer.h"
 #include "StarViewerPawn.h"
 #include "UnrealClient.h"
 
@@ -54,14 +62,110 @@ void AStellarSpikeGameMode::InitGame(const FString& MapName, const FString& Opti
 void AStellarSpikeGameMode::StartPlay()
 {
 	StarField = GetWorld()->SpawnActor<AStarField>();
+	GetWorld()->SpawnActor<AStarPointer>()->SetStarField(StarField);
+	if (FParse::Param(FCommandLine::Get(), TEXT("TestObject")))
+	{
+		SpawnTestObject();
+	}
+	const bool bHeadset = GEngine->XRSystem.IsValid() && GEngine->XRSystem->IsHeadTrackingAllowed();
+	if (bHeadset || FParse::Param(FCommandLine::Get(), TEXT("SkySphere")) || FCString::Strifind(FCommandLine::Get(), TEXT("SkySphere=")))
+	{
+		SpawnSkySphere();
+	}
 	Super::StartPlay();
+}
+
+void AStellarSpikeGameMode::SpawnTestObject()
+{
+	// 1 m ahead of a headset's starting point and 1.4 m above the floor, about eye height.
+	const FVector Position = HeadsetPosition + FVector(100.0, 0.0, 140.0);
+	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	if (Cube == nullptr)
+	{
+		UE_LOG(LogStellarSpike, Error, TEXT("Test object: /Engine/BasicShapes/Cube is not in the package"));
+		return;
+	}
+	AStaticMeshActor* Actor = GetWorld()->SpawnActor<AStaticMeshActor>(Position, FRotator(20.0, 30.0, 0.0));
+	Actor->SetMobility(EComponentMobility::Movable);
+	Actor->GetStaticMeshComponent()->SetStaticMesh(Cube);
+	// The basic cube is 1 m across; make it 20 cm.
+	Actor->SetActorScale3D(FVector(0.2));
+	APointLight* Light = GetWorld()->SpawnActor<APointLight>(Position + FVector(-50.0, -30.0, 40.0), FRotator::ZeroRotator);
+	Light->SetMobility(EComponentMobility::Movable);
+	Light->PointLightComponent->SetIntensity(5000.0f);
+	Light->PointLightComponent->SetAttenuationRadius(500.0f);
+	UE_LOG(LogStellarSpike, Display, TEXT("Test object at %s"), *Position.ToString());
+}
+
+void AStellarSpikeGameMode::SpawnSkySphere()
+{
+	UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	if (Material == nullptr)
+	{
+		UE_LOG(LogStellarSpike, Error, TEXT("Sky sphere: /Engine/BasicShapes/BasicShapeMaterial is not in the package"));
+		return;
+	}
+	// By default beyond the furthest star, about 1,000 pc. Nothing lights it, so it is black.
+	double RadiusParsecs = 1200.0;
+	FParse::Value(FCommandLine::Get(), TEXT("SkySphere="), RadiusParsecs);
+	const double Radius = RadiusParsecs * AStarField::UnitsPerParsec;
+
+	// A latitude-longitude sphere. Each triangle is added with both windings, so it is seen
+	// from inside whichever way the renderer culls; a negative scale does not do this,
+	// because Unreal flips its culling to compensate.
+	constexpr int32 Rings = 32, Segments = 64;
+	TArray<FVector> Vertices;
+	TArray<int32> Triangles;
+	for (int32 Ring = 0; Ring <= Rings; ++Ring)
+	{
+		const double Polar = PI * Ring / Rings;
+		for (int32 Segment = 0; Segment <= Segments; ++Segment)
+		{
+			const double Azimuth = 2.0 * PI * Segment / Segments;
+			Vertices.Add(Radius * FVector(FMath::Sin(Polar) * FMath::Cos(Azimuth), FMath::Sin(Polar) * FMath::Sin(Azimuth), FMath::Cos(Polar)));
+		}
+	}
+	for (int32 Ring = 0; Ring < Rings; ++Ring)
+	{
+		for (int32 Segment = 0; Segment < Segments; ++Segment)
+		{
+			const int32 A = Ring * (Segments + 1) + Segment, B = A + Segments + 1;
+			Triangles.Append({A, B, A + 1, A + 1, B, B + 1});
+			Triangles.Append({A, A + 1, B, A + 1, B + 1, B});
+		}
+	}
+	AActor* Sky = GetWorld()->SpawnActor<AActor>();
+	UProceduralMeshComponent* Mesh = NewObject<UProceduralMeshComponent>(Sky, TEXT("SkySphere"));
+	Sky->SetRootComponent(Mesh);
+	Mesh->RegisterComponent();
+	Mesh->SetCastShadow(false);
+	Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	const TArray<FVector> NoNormals;
+	const TArray<FVector2D> NoUVs;
+	const TArray<FColor> NoColours;
+	const TArray<FProcMeshTangent> NoTangents;
+	Mesh->CreateMeshSection(0, Vertices, Triangles, NoNormals, NoUVs, NoColours, NoTangents, false);
+	Mesh->SetMaterial(0, Material);
+	UE_LOG(LogStellarSpike, Display, TEXT("Sky sphere of radius %.0f pc"), RadiusParsecs);
+}
+
+void AStellarSpikeGameMode::LogCamera() const
+{
+	const APlayerController* Player = GetWorld()->GetFirstPlayerController();
+	if (Player && Player->PlayerCameraManager)
+	{
+		const FVector Location = Player->PlayerCameraManager->GetCameraLocation();
+		const FVector Forward = Player->PlayerCameraManager->GetCameraRotation().Vector();
+		UE_LOG(LogStellarSpike, Display, TEXT("Camera at %s (pc), facing %s, FOV %.1f"),
+			*(Location / AStarField::UnitsPerParsec).ToString(), *Forward.ToString(), Player->PlayerCameraManager->GetFOVAngle());
+	}
 }
 
 APawn* AStellarSpikeGameMode::SpawnDefaultPawnFor_Implementation(AController* NewPlayer, AActor* StartSpot)
 {
 	const bool bHeadset = GEngine->XRSystem.IsValid() && GEngine->XRSystem->IsHeadTrackingAllowed();
 	// Just off the Sun when looking at the sky from it, so the Sun itself is behind the camera.
-	FVector Position = LookAt ? -LookAt.GetValue() * 0.001 : StartPosition;
+	FVector Position = LookAt ? LookAt.GetValue() * 0.001 : StartPosition;
 	FRotator Facing = LookAt ? LookAt->Rotation() : (-StartPosition).Rotation();
 	if (bHeadset)
 	{
@@ -102,6 +206,13 @@ void AStellarSpikeGameMode::Tick(float DeltaSeconds)
 		FrameTimes.Add(DeltaSeconds);
 	}
 
+	// In a headset, where the view cannot be seen from the Mac, log where it is.
+	if (GEngine->XRSystem.IsValid() && Elapsed >= NextCameraLog)
+	{
+		LogCamera();
+		NextCameraLog = Elapsed + 2.0;
+	}
+
 	APlayerController* Player = GetWorld()->GetFirstPlayerController();
 	// A scripted view must not be steered by wherever the mouse happens to be, so it is set every frame.
 	if (LookAt && QuitAfter > 0.0 && Player)
@@ -122,13 +233,7 @@ void AStellarSpikeGameMode::Tick(float DeltaSeconds)
 	{
 		if (!bScreenshotRequested)
 		{
-			if (Player && Player->PlayerCameraManager)
-			{
-				const FVector Location = Player->PlayerCameraManager->GetCameraLocation();
-				const FVector Forward = Player->PlayerCameraManager->GetCameraRotation().Vector();
-				UE_LOG(LogStellarSpike, Display, TEXT("Camera at %s (pc), facing %s, FOV %.1f"),
-					*(Location / AStarField::UnitsPerParsec).ToString(), *Forward.ToString(), Player->PlayerCameraManager->GetFOVAngle());
-			}
+			LogCamera();
 			// One file per kind of run, so a later run cannot overwrite another's picture.
 			const TCHAR* Name = bAutopilot ? TEXT("StellarSpike-orbit") : LookAt ? TEXT("StellarSpike-look") : TEXT("StellarSpike-view");
 			FScreenshotRequest::RequestScreenshot(Name, false, false);

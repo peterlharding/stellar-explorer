@@ -10,8 +10,8 @@ RUN := cd $(PIPELINE) && uv run --locked
 check: lint typecheck test docs version-check
 
 lint:
-	$(RUN) ruff format --check . ../../scripts
-	$(RUN) ruff check . ../../scripts
+	$(RUN) ruff format --check . ../../scripts ../../spikes/unreal-stars/Scripts
+	$(RUN) ruff check . ../../scripts ../../spikes/unreal-stars/Scripts
 
 typecheck:
 	$(RUN) mypy stellar_pipeline tests ../../scripts
