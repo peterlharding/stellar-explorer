@@ -1,14 +1,15 @@
 # Direction discussion, 30 October 2026
 
 Notes from a discussion between PLH and Claude on how the project moves forward after the Unreal spike, and which features would improve the application.
-What is settled here is folded into [../PLAN.md](../PLAN.md) (phases, gates, open questions) and [../BACKLOG.md](../BACKLOG.md) (features not yet scheduled); settled engine and architecture choices become ADRs.
+As points are settled they are folded into [../PLAN.md](../PLAN.md) (phases, gates, open questions) and [../BACKLOG.md](../BACKLOG.md) (features not yet scheduled); settled engine and architecture choices become ADRs.
+Folded so far: the roadmap changes (items 1 to 3) into the plan, and every feature into the backlog.
 
 Each point is marked **Open**, **Agreed** or **Deferred** under its heading.
 
 ## Where things stand
 
 - The Unreal spike ([../../spikes/unreal-stars/README.md](../../spikes/unreal-stars/README.md)) renders all 113,012 catalogue stars at 120 fps on the Mac and about 95 fps in full immersion on the Vision Pro.
-  Getting there took sixteen rounds of fixes, recorded for an article in [VISIONOS.md](../../spikes/unreal-stars/VISIONOS.md).
+  The history, written for an article, is in [VISIONOS.md](../../spikes/unreal-stars/VISIONOS.md): sixteen sections, eight fixes to reach full immersion and the rest on making the stars visible, tuning, and the pointer.
 - In the headset a hand pointer names stars: one ray on a configurable hand, a panel at the bottom right of the view that follows the head, pinch to keep a star, two pinches to let it go, both hands held to exit.
   Keeping is solid; letting go is good enough for now but not perfect.
 - The plan still describes a Godot front end ([ADR 0007](../decisions/0007-stack-core-sqlite-godot.md)); the spike's evidence points to Unreal, which would be ADR 0012, superseding 0007.
@@ -57,7 +58,8 @@ Phase 2 becomes the spike grown into the real application, on the C++ core.
 The Vive test runs on PLH's Windows 11 PC, from a checkout of this repository.
 To get there:
 
-- The spike's work must be on GitHub, so `feature-star-panel` (or `main`, once it is merged) has to be committed and pushed first.
+- The spike's work must be on GitHub: done, `feature-star-panel` was pushed on 30 October.
+- The setup and commands are in the spike's README, [Part 3](../../spikes/unreal-stars/README.md#part-3-htc-vive-pro-2-on-windows-not-started); the points below are why it is set up that way.
 - Unreal 5.8.4 for Windows, Visual Studio with the C++ game workload, and SteamVR for the Vive.
 - PLH works in WSL on Windows, so `spike.sh` runs there too: under WSL it calls Unreal's Windows programs (`UnrealBuildTool.exe`, `UnrealEditor.exe`) with paths translated by `wslpath`, and has a `vive` command that starts the game in the headset through SteamVR.
 - The checkout lives on the Windows drive, at `D:\src\Projects\stellar-explorer` (`/mnt/d/src/Projects/stellar-explorer` in WSL): Unreal and Visual Studio are slow with, and sometimes break on, paths inside WSL's own filesystem.
@@ -65,6 +67,28 @@ To get there:
 - `.gitattributes` keeps shell scripts and the Makefile in LF, whichever git checks them out.
 - The catalogue builds natively in WSL (`make catalogue`, with Python and `uv` installed there), straight into `data/`, where the spike looks for it.
 - `Config/UserEngine.ini` (Apple signing) is not needed on Windows.
+- The pointer knows only hand tracking, so on the Vive it needs a controller path (the ray from the controller, the trigger for the pinch); it is written and tested on the PC, after a first session that checks the stars and the frame rate.
+- `feature-star-panel` is merged into `main` after the Vive test, so `main` gets the whole spike at once, followed by ADR 0012.
+
+### 4. From spike to application
+
+**Deferred until after the Vive test,** when the spike is complete on both headsets and what carries over can be judged on both.
+
+### 6. The plan's open questions
+
+**Open, with evidence gathered.**
+
+- **Vision Pro standalone or rendered on a Mac.** The spike runs standalone on the Vision Pro at about 95 fps with every star, which suggests standalone is enough; Mac rendering would matter only if the scale-up (phase 7) outgrows the headset.
+  To settle with ADR 0012.
+- **The Vive's graphics card.** Answered on the PC during the Vive test.
+- **Display units.** F1 offers light-years or parsecs as a setting; which is the default is still open.
+
+### 7. Working practice
+
+**Agreed in part.**
+
+- The spike branch, `feature-star-panel`, is merged into `main` after the Vive test (see the Vive test, below).
+- When the first versioned release is due: **deferred** until the application, not the spike, has something to release (phase 2).
 
 ### A fix to the spike: the ray starts off
 

@@ -39,7 +39,7 @@ Problems met and fixed on the way, worth knowing for the real app:
 
 ### Part 2: Vision Pro (runs in full immersion)
 
-Getting there took eight fixes, recorded with their evidence in [VISIONOS.md](VISIONOS.md).
+Reaching full immersion took eight fixes (sections 1 to 9 of [VISIONOS.md](VISIONOS.md), with their evidence); sections 10 to 16 cover what came after: the stars made visible, tuning, and the pointer and panel.
 The ones that matter for the real app: package with `-pak`; start the engine from `VisionOSStartup.cpp`, because the launcher engine's scene lifecycle never starts in a SwiftUI app; override the Vision Pro device profile's `r.Mobile.XRMSAAMode`; keep SQLite's temporary tables in memory; and declare the tracking usage descriptions in `Info.plist`.
 
 
@@ -66,5 +66,7 @@ To record: frame rate in the headset, which controllers are in use (wands with t
 
 ## Still to judge
 
-- Stars look right but are understated: the brightest stars need a bloom or glare that reads as brilliance, and the exposure wants tuning in a headset, not on a monitor.
-- Ready for the headsets, untested in them: the pawn's camera follows the headset, and in a headset the view starts 1.5 m from the Sun at 1 pc to 1 m, so α Centauri is 1.3 m away. Forward shading, MSAA, instanced stereo and mobile multiview are on; `Config/VisionOS` and `Config/Windows` start the app in VR; the catalogue is staged into packages as a plain file.
+- Stars look right but are understated: the brightest stars need a bloom or glare that reads as brilliance.
+  The headset exposure is tuned (0.25 on the Vision Pro); the Vive's is not yet.
+- Untested on the Vive: `Config/Windows` starts the app in VR, the view starts 1.5 m from the Sun at 1 pc to 1 m (so α Centauri is 1.3 m away), and the pointer knows only hand tracking, so it needs a controller path there.
+  All of this works on the Vision Pro.
