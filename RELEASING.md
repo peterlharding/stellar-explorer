@@ -51,7 +51,27 @@ As components land, each gains a version field that has no reason to agree with 
 
 `scripts/version.py` writes them together and `make version-check` (part of `make check`) fails on drift. Do not edit version fields by hand; add each new one to `FIELDS` in `scripts/version.py`.
 
+## Branches
+
+`main` is always releasable: every commit on it passes `make check`, and releases are cut from it.
+Development happens on a branch off `main`, merged back when the work is finished and every check passes.
+
+- `feature-<name>` for a feature or a change of approach, such as `feature-star-panel`.
+- `fix-<name>` for a bug fix.
+- `docs-<name>` for documentation or process changes made on their own.
+
+Keep each branch to one piece of work, and merge it with `git merge --no-ff` so the work stays visible as a unit in history.
+Delete the branch once it is merged.
+
+A branch can also park an approach that was replaced, so it can be run again for comparison.
+Name it after the approach, such as `pointer-label`, and never merge it.
+
+There is no long-lived `devel` branch: with one developer and no CI yet, it would only be a second `main` to keep in step.
+Revisit this when releases need a stabilisation period.
+
 ## Release steps
+
+0. **Start on `main`**, with every branch going into the release merged and `git status` clean.
 
 1. **Pick the version number** based on the nature of the changes (see Versioning above).
 
