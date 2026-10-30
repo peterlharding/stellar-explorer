@@ -18,6 +18,7 @@
 		{ "Name": "OpenXR", "Enabled": true },
 		{ "Name": "OpenXRVisionOS", "Enabled": true },
 		{ "Name": "OpenXRHandTracking", "Enabled": true },
-		{ "Name": "Fab", "Enabled": false }
+		{ "Name": "Fab", "Enabled": false },
+		{ "Name": "AndroidFileServer", "Enabled": false }
 	]
 }

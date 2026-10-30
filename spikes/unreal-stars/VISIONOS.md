@@ -222,6 +222,59 @@ Values that only a person in the headset can judge were made launch options, set
   The label faces the viewer square on, below the star as seen from there.
   The ray is a line of 18 small dim dots from 10 cm to 3 m, each the same apparent size.
 
+## 15. A panel instead of a label, and a steadier ray (30 October)
+
+- **From the second session.** Selection was more reliable but still often missed, and pinching visibly moved the ray off the star.
+  The ray could hardly be seen: the dots that answered "too bright" were 1.5 mm across and nearly black.
+- **What the log showed, once read properly.** Every pinch that registered selected a star; my first search of the log matched only names starting with a capital, so "22 Eri" and "tau Pup" looked like failures.
+  The gaps logged at each pinch (1.7 to 2.5 cm) are the first readings under the 2.5 cm threshold, so they say nothing about pinches that never got that close.
+  In a third of pinches the star under the ray at the pinch differed from the one 0.15 s before: the hand does move.
+- **Changes.**
+  - The ray passes through the middle of the hand (the `Palm` joint) instead of the index knuckle, since the palm moves less as the fingers close, and its direction is smoothed over about 50 ms.
+  - A pinch selects what the ray was on before thumb and index began to close (the last frame they were 4.5 cm apart, up to half a second back), not a fixed 0.15 s before.
+  - A pinch starts below 3 cm, not 2.5, and the log now records hands that closed without reaching that ("Near pinch ... at closest"), for tuning it.
+  - The dots are twice the size and brighter.
+- **The panel.** The label beside the star is replaced by a panel with an outline and a clear interior, 1 m away at the bottom right of the view, turning with the head a little behind it.
+  It describes the star the ray is on as it moves, so reading a star's details no longer needs a pinch; a pinch keeps a star, which the panel describes when nothing else is pointed at.
+  The previous approach is kept on the `pointer-label` branch, for comparison.
+- **A trap: the tonemapper washes out overlay colours.** On the Mac the text came out white and the amber selection ring pale cream.
+  Unreal's filmic tonemapper desaturates bright colours towards white, so the overlays are now drawn at 40% of their intended colour.
+  And `UTextRenderComponent`'s colour reaches the material as vertex colour without the sRGB-to-linear conversion, so the text colour is passed as linear (`ToFColor(false)`) to match the rings.
+
+## 16. Keeping a star, and why the ray was black (30 October)
+
+- **From the third session.** The panel was a lot better; taps still sometimes failed to select; a selected star's details should stay put long enough to read; and the ray was black, seen only as it hid the stars behind it.
+- **A trap: a material on instanced meshes in a cooked build.** The dots are instances of one sphere (`UInstancedStaticMeshComponent`), and a material needs the "used with instanced static meshes" usage flag to draw them.
+  The editor sets the flag the first time it meets that use, so on the Mac nothing looked wrong; a cooked build cannot, and silently draws the dots with the default lit material, which is black in an unlit scene, with no warning in the device log.
+  The rings use the same material on procedural meshes, which need no flag, so they showed.
+  What worked: the material script sets `used_with_instanced_static_meshes`.
+- **What the log said about the taps.** A relaxed pointing hand rests with thumb and index 4 to 4.5 cm apart, which is where the pinch's release threshold was.
+  So a pinch could fail to end, and then the next tap had no start to detect; and a pinch that took "before the fingers closed" to mean "the last time they were 4.5 cm apart" could reach back half a second, to while the ray was still sweeping.
+  Near misses at 3.3 to 3.9 cm were each followed within two seconds by a pinch that worked: tries that stopped short of the 3 cm threshold.
+- **Changes.**
+  - A pinch starts below 3.5 cm, and ends once thumb and index part 1 cm from the closest they came, or beyond 4.5 cm.
+  - A pinch keeps the star the ray was on as the fingers began to close: the last frame they were within 1 mm of their widest in the half second before, whatever the hand's resting gap.
+  - A kept star holds the panel: pointing elsewhere does nothing, and two pinches within 0.6 s let it go. A line at the foot of the panel says what a pinch will do.
+- **From the fourth session.** Much better, and the ray visible; but a ray on each hand made no sense.
+  Now only the pointing hand has a ray: `PointingHand=Right` in `DefaultGame.ini`, or `-PointingHand=Left` on the command line, for left-handed viewers.
+  The other hand is tracked only for the two-handed exit.
+  While a star is kept the ray is hidden, and it returns when two pinches let the star go.
+- **Telling builds apart.** Four headset builds in a morning, all reporting Unreal's defaults (version 1.0, build 58902052, which is the engine's changelist), left only file times to say which code a session ran.
+  `spike.sh` now writes the commit, with "+changes" for uncommitted work, the branch and the build time into a git-ignored `BuildStamp.inl`; the game logs it at start, and the panel shows it when there is nothing to describe, as at start-up.
+  The splash window would be the natural place, but it is the engine's own SwiftUI code (`SwiftMain.swift`, with fixed text), compiled into the launcher engine and holding the app's entry point, so a project cannot change or replace it.
+- **From the fifth session: contact bounce.** A pinch kept a star for an instant, and then the ray came back.
+  The log showed why: 0.06 to 0.2 s after nearly every pinch that kept a star, a second pinch began, which counted as the double pinch that lets the star go.
+  As thumb and index touch they hide each other from the headset's cameras, and the measured gap jumps by a centimetre or more for a frame or two, enough to end the pinch and start another.
+  Two fixes: a pinch now ends only once the fingers have stayed apart for 0.15 s, and for a second after a star is kept or let go further pinches are ignored (`GestureGateSeconds` in `DefaultGame.ini`, or `-GestureGate=`), with each ignored pinch logged.
+- **From the sixth session: keeping is solid, letting go is not.** The pinches made to let a star go came 0.53 to 0.75 s apart, mostly outside the 0.6 s window; the new debounce adds 0.15 s to every pinch's release.
+  And a pinch could begin the moment the last ended, with the fingers barely apart (the log's "widest 1.9 cm"), adding pinches nobody made.
+  Now two pinches within 1 s let a star go (`DoublePinchSeconds`, or `-DoublePinch=`), and each pinch must close by 1 cm from the widest the fingers opened since the last.
+- **From the seventh session: quick pinches refused.** Letting go needed slow, deliberate pinches, and a run of several pinches counted only the last two.
+  Between quick pinches the fingers open only partway, and requiring each pinch to close by 1 cm from that opening refused pinches that reached 2.2 cm, well inside the threshold; the log's near misses show them.
+  Now a pinch need only close by 0.6 cm, and the release debounce is 0.1 s rather than 0.15 s, since the jumps it guards against last a frame or two.
+- **The ray waits to be asked for.** At start the ray was already on; PLH wanted an explicit action to begin.
+  In a headset the ray is now off until a first pinch, which is followed by the same one-second gate as keeping a star, so that pinch cannot also keep one.
+
 ## Harmless noise in the logs
 
 - "Ensure condition failed: ViewController" in `FIOSApplication::HandlePhysicalKeyboardConnectionChanged`: a handled ensure when a keyboard is reported at start-up, with no UIKit view controller on visionOS.
@@ -235,4 +288,4 @@ Values that only a person in the headset can judge were made launch options, set
 - Sharpness: foveation is off in the engine's precompiled SwiftUI code (section 13).
 - The system's concentric-circle control in view (section 13).
 - White arcs at the outer lower edge of each eye, not in Unreal's frame; probably lens glare from the Sun.
-- The pointer's second round of changes (section 14), not yet tried in the headset.
+- One ray, hidden while a star is kept (section 16), not yet tried in the headset.

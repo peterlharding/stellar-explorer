@@ -171,6 +171,9 @@ def build_pointer():
     material = new_material("M_Pointer")
     material.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
     material.set_editor_property("two_sided", True)
+    # The dots are instanced meshes. The editor adds this usage when it first meets one, but a
+    # cooked build cannot, and silently draws them with the default lit material: black here.
+    material.set_editor_property("used_with_instanced_static_meshes", True)
     colour = node(
         material,
         unreal.MaterialExpressionVectorParameter,

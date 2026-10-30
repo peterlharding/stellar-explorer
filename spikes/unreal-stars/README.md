@@ -45,9 +45,24 @@ The ones that matter for the real app: package with `-pak`; start the engine fro
 
 - **Platform files.** The iOS and visionOS target platforms are optional downloads in the Epic Games Launcher (the engine's Installation Options, Target Platforms; visionOS requires iOS). The launcher will not change an engine while any of its editors is running: it defers the install silently, so close every Unreal Editor first.
 - **Toolchain.** With the OpenXR visionOS plugin enabled, the spike compiles and links for visionOS with Xcode 27.1 and the visionOS 27.0 SDK, although Unreal 5.8 states only "Xcode 15.3 or later". The build then stops at signing, which needs the developer's team in `Config/UserEngine.ini` (`[/Script/MacTargetPlatform.XcodeProjectSettings]`, `CodeSigningTeam=`).
-- **Working:** the whole sky in full immersion at about 95 frames a second, and a hand pointer that names the star it points at; see [VISIONOS.md](VISIONOS.md), sections 12 to 14.
+- **Working:** the whole sky in full immersion at about 95 frames a second, and a hand pointer whose panel describes the star it points at; see [VISIONOS.md](VISIONOS.md), sections 12 to 16.
 
 ### Part 3: HTC Vive Pro 2 on Windows (not started)
+
+On PLH's Windows 11 PC, driven from WSL.
+Needs Unreal 5.8.4 for Windows, Visual Studio with the C++ game workload, SteamVR as the active OpenXR runtime, and Python with `uv` in WSL.
+
+```sh
+cd /mnt/d/src/Projects/stellar-explorer   # on a Windows drive, not in WSL's own filesystem
+make catalogue                            # builds data/catalogue.sqlite
+cd spikes/unreal-stars
+./spike.sh build && ./spike.sh material
+./spike.sh run                            # on the monitor first
+./spike.sh vive                           # then in the headset
+```
+
+`spike.sh` calls Unreal's Windows programs when it finds itself under WSL; `UE_ROOT` overrides the engine's place if it is not under `C:\Program Files\Epic Games\UE_5.8`.
+To record: frame rate in the headset, which controllers are in use (wands with trackpads, or Index controllers with thumbsticks), and anything that differs from the Vision Pro.
 
 ## Still to judge
 
