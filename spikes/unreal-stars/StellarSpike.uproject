@@ -16,7 +16,7 @@
 		{ "Name": "PythonScriptPlugin", "Enabled": true },
 		{ "Name": "EditorScriptingUtilities", "Enabled": true },
 		{ "Name": "OpenXR", "Enabled": true },
-		{ "Name": "OpenXRVisionOS", "Enabled": true },
+		{ "Name": "OpenXRVisionOS", "Enabled": true, "PlatformAllowList": [ "Mac", "IOS", "VisionOS" ] },
 		{ "Name": "OpenXRHandTracking", "Enabled": true },
 		{ "Name": "Fab", "Enabled": false },
 		{ "Name": "AndroidFileServer", "Enabled": false }

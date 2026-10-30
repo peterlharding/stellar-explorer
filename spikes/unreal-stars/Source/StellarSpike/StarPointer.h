@@ -14,10 +14,11 @@ class UTextRenderComponent;
 /**
  * Point at a star to see what it is, and pinch to keep it.
  *
- * In a headset the pointing hand (PointingHand, right unless set otherwise) casts a ray
- * from an estimated shoulder through the hand, and a pinch (thumb tip to index tip) selects.
- * The other hand is tracked only for the gesture that quits. On the desktop the ray is the view's
- * centre and the left mouse button selects. The star pointed at is ringed and described
+ * In a headset with hand tracking (the Vision Pro) the pointing hand (PointingHand, right unless
+ * set otherwise) casts a ray from an estimated shoulder through the hand, and a pinch (thumb tip to
+ * index tip) selects. In a headset with controllers instead (the Vive) the ray is the controller's
+ * aim and the trigger selects. The other hand (or controller) is tracked only for the gesture that
+ * quits. On the desktop the ray is the view's centre and the left mouse button selects. The star pointed at is ringed and described
  * in a panel at the bottom right of the view, which follows the head. In a headset the ray
  * is off at start, and a first pinch turns it on. A pinch then keeps the
  * star: it is ringed in another colour, the panel stays on it, and the ray goes until two
@@ -86,6 +87,8 @@ private:
 
 	/** The rays this frame: one per tracked hand in a headset, the view's centre on the desktop. */
 	TArray<FRay, TInlineAllocator<2>> GetRays(const FVector& Head, const FRotator& HeadRotation);
+	/** The rays from motion controllers, when the headset has those instead of hand tracking. */
+	void AppendControllerRays(TArray<FRay, TInlineAllocator<2>>& Rays);
 	void Select(int32 Star);
 	void PlaceRing(UProceduralMeshComponent* Ring, int32 Star, const FVector& Head) const;
 	void PlacePanel(const FVector& Head, const FRotator& HeadRotation, float DeltaSeconds);
@@ -109,6 +112,18 @@ private:
 	/** Two pinches this close together, with a star kept, let it go. From DefaultGame.ini, or -DoublePinch=. */
 	UPROPERTY(Config)
 	float DoublePinchSeconds = 1.0f;
+
+	/**
+	 * The keys the controllers' triggers appear as, when the headset has controllers (the Vive).
+	 * The exact name depends on the controller and is settled by the Vive test: the log prints the
+	 * live value, and -RightTriggerKey= / -LeftTriggerKey= try another without a rebuild.
+	 * Candidates if the generic name is empty: ValveIndex_*_Trigger_Click, HTCViveController_*_Trigger.
+	 */
+	UPROPERTY(Config)
+	FString RightTriggerKey = TEXT("MotionController_Right_Trigger");
+
+	UPROPERTY(Config)
+	FString LeftTriggerKey = TEXT("MotionController_Left_Trigger");
 
 	/** The pointing hand's ray, drawn as dots. */
 	UPROPERTY()
@@ -153,6 +168,10 @@ private:
 	bool bPanelPlaced = false;
 	double BothPinchedSeconds = 0.0;
 	bool bHeadset = false;
+	/** Set once a tracked controller is seen, so the panel says "trigger" rather than "pinch". */
+	bool bUsingControllers = false;
+	/** Throttles the trigger-value log that the Vive test reads to confirm the key name. */
+	double NextControllerLog = 0.0;
 
 	static constexpr double MaxPointingAngleDegrees = 2.0;
 	static constexpr double HoldToExitSeconds = 2.0;

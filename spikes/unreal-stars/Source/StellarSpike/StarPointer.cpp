@@ -14,8 +14,10 @@
 #include "InputCoreTypes.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Misc/CommandLine.h"
+#include "MotionControllerComponent.h"
 #include "ProceduralMeshComponent.h"
 #include "StarField.h"
+#include "StarViewerPawn.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogStarPointer, Log, All);
 
@@ -54,6 +56,10 @@ namespace
 	constexpr double PinchOnset = 0.1;
 	// How long the ray's direction takes to follow the hand, to steady it.
 	constexpr double RaySmoothingSeconds = 0.05;
+	// A controller trigger counts as a pinch past TriggerPress, and releases below TriggerRelease:
+	// the gap between them stops a trigger held near the threshold from flickering.
+	constexpr float TriggerPress = 0.6f;
+	constexpr float TriggerRelease = 0.4f;
 	// Angular radius of the rings around a star.
 	constexpr double RingDegrees = 0.7;
 	// The panel: its centre's place in front of the head (forward, right, up), its size,
@@ -63,9 +69,10 @@ namespace
 	constexpr double PanelHeight = 12.0;
 	constexpr double PanelPadding = 1.6;
 	constexpr double FrameThickness = 0.12;
-	constexpr double TitleSize = 2.4;
-	constexpr double DetailsSize = 1.8;
-	constexpr double HintSize = 1.4;
+	// Text heights go to SetWorldSize, which takes a float.
+	constexpr float TitleSize = 2.4f;
+	constexpr float DetailsSize = 1.8f;
+	constexpr float HintSize = 1.4f;
 	constexpr double PanelFollowSeconds = 0.12;
 	constexpr double LightYearsPerParsec = 3.26156;
 
@@ -242,6 +249,8 @@ void AStarPointer::BeginPlay()
 	FParse::Value(FCommandLine::Get(), TEXT("PointingHand="), PointingHand);
 	FParse::Value(FCommandLine::Get(), TEXT("GestureGate="), GestureGateSeconds);
 	FParse::Value(FCommandLine::Get(), TEXT("DoublePinch="), DoublePinchSeconds);
+	FParse::Value(FCommandLine::Get(), TEXT("RightTriggerKey="), RightTriggerKey);
+	FParse::Value(FCommandLine::Get(), TEXT("LeftTriggerKey="), LeftTriggerKey);
 	if (!bHeadset)
 	{
 		Pointer = MouseHand;
@@ -286,8 +295,11 @@ TArray<AStarPointer::FRay, TInlineAllocator<2>> AStarPointer::GetRays(const FVec
 	const IHandTracker* Tracker = FindHandTracker();
 	if (Tracker == nullptr)
 	{
+		// No hand tracking: a headset with controllers (the Vive), or none yet.
+		AppendControllerRays(Rays);
 		return Rays;
 	}
+	bUsingControllers = false;
 	// The shoulders turn with the head's yaw but not its pitch or roll.
 	const FRotator Body(0.0, HeadRotation.Yaw, 0.0);
 	const FVector Right = FRotationMatrix(Body).GetUnitAxis(EAxis::Y);
@@ -362,6 +374,48 @@ TArray<AStarPointer::FRay, TInlineAllocator<2>> AStarPointer::GetRays(const FVec
 		Rays.Add({Through, State.Direction, State.bPinched, HandIndex, Gap});
 	}
 	return Rays;
+}
+
+void AStarPointer::AppendControllerRays(TArray<FRay, TInlineAllocator<2>>& Rays)
+{
+	const APlayerController* Player = GetWorld()->GetFirstPlayerController();
+	const AStarViewerPawn* Viewer = Player ? Cast<AStarViewerPawn>(Player->GetPawn()) : nullptr;
+	if (Viewer == nullptr)
+	{
+		return;
+	}
+	const double Now = GetWorld()->GetRealTimeSeconds();
+	const bool bLog = Now >= NextControllerLog;
+	// Right first then left, as the hand path adds them, so the pointing hand's index matches.
+	for (const int32 HandIndex : {1, 0})
+	{
+		FHand& State = Hands[HandIndex];
+		const UMotionControllerComponent* Controller = Viewer->GetHandController(HandIndex);
+		if (Controller == nullptr || !Controller->IsTracked())
+		{
+			State = FHand();
+			continue;
+		}
+		bUsingControllers = true;
+		const FKey TriggerKey(*(HandIndex == 0 ? LeftTriggerKey : RightTriggerKey));
+		const float Trigger = Player->GetInputAnalogKeyState(TriggerKey);
+		// Hysteresis around the press threshold; State.bPinched carries between frames.
+		State.bPinched = State.bPinched ? Trigger > TriggerRelease : Trigger > TriggerPress;
+		if (bLog)
+		{
+			UE_LOG(LogStarPointer, Display, TEXT("Controller hand %d: trigger \"%s\" = %.2f, pinched %d"), HandIndex,
+				*(HandIndex == 0 ? LeftTriggerKey : RightTriggerKey), Trigger, State.bPinched);
+		}
+		// The ray is the controller's aim pose. A controller barely moves as the trigger is pulled,
+		// so, unlike a hand, it needs no smoothing and no look-back: Gap is 0 while pulled and
+		// PinchEnd otherwise, which keeps the selection logic in Tick selecting what is pointed at.
+		const double Gap = State.bPinched ? 0.0 : PinchEnd;
+		Rays.Add({Controller->GetComponentLocation(), Controller->GetForwardVector(), State.bPinched, HandIndex, Gap});
+	}
+	if (bLog)
+	{
+		NextControllerLog = Now + 1.0;
+	}
 }
 
 void AStarPointer::Tick(float DeltaSeconds)
@@ -518,7 +572,7 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 
 	if (BothPinchedSeconds > 0.0)
 	{
-		Title->SetText(FText::FromString(TEXT("Keep pinching to exit")));
+		Title->SetText(FText::FromString(bUsingControllers ? TEXT("Hold both triggers to exit") : TEXT("Keep pinching to exit")));
 		Title->SetTextRenderColor((SelectionColour * OverlayBrightness).ToFColor(false));
 		Details->SetText(FText::FromString(FString::Printf(TEXT("Exiting in %.0f s"), FMath::CeilToDouble(HoldToExitSeconds - BothPinchedSeconds))));
 		Hint->SetText(FText::GetEmpty());
@@ -527,18 +581,23 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 	if (Selected != INDEX_NONE)
 	{
 		ShowStar(Selected, SelectionColour);
-		Hint->SetText(FText::FromString(bHeadset ? TEXT("Pinch twice to let it go") : TEXT("Double-click to let it go")));
+		Hint->SetText(FText::FromString(!bHeadset ? TEXT("Double-click to let it go")
+				: bUsingControllers               ? TEXT("Pull the trigger twice to let it go")
+												  : TEXT("Pinch twice to let it go")));
 		return;
 	}
-	Hint->SetText(FText::FromString(!bPointingStarted ? TEXT("Then pinch again to keep a star")
-			: bHeadset                              ? TEXT("Pinch to keep a star, both hands to exit")
-													: TEXT("Click to keep a star")));
+	Hint->SetText(FText::FromString(!bPointingStarted ? (bUsingControllers ? TEXT("Then pull the trigger again to keep a star") : TEXT("Then pinch again to keep a star"))
+			: !bHeadset                             ? TEXT("Click to keep a star")
+			: bUsingControllers                     ? TEXT("Pull the trigger to keep a star, both to exit")
+													: TEXT("Pinch to keep a star, both hands to exit")));
 	if (Hovered != INDEX_NONE)
 	{
 		ShowStar(Hovered, HoverColour);
 		return;
 	}
-	Title->SetText(FText::FromString(!bPointingStarted ? TEXT("Pinch to start pointing") : bHeadset ? TEXT("Point at a star") : TEXT("Look at a star")));
+	Title->SetText(FText::FromString(!bPointingStarted ? (bUsingControllers ? TEXT("Pull the trigger to start pointing") : TEXT("Pinch to start pointing"))
+			: bHeadset                              ? TEXT("Point at a star")
+													: TEXT("Look at a star")));
 	Title->SetTextRenderColor((HintColour * OverlayBrightness).ToFColor(false));
 	// With nothing to describe, the build, so a session can be matched to its code.
 	Details->SetText(FText::FromString(FString::Printf(TEXT("Build %s\n%s, %s"), STELLAR_SPIKE_COMMIT, STELLAR_SPIKE_BRANCH, STELLAR_SPIKE_BUILT)));
