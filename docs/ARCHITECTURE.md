@@ -129,7 +129,7 @@ Because the core has no engine dependency, it gets ordinary unit tests: known st
 | `docs/` | This documentation |
 | `src/pipeline/` | Python ingest: public catalogues to `catalogue.sqlite` |
 | `src/core/` | Core library and its tests |
-| `src/app/` | Godot project |
+| `src/app/` | Unreal project (the front end) |
 | `tours/` | Tour files |
 | `scenarios/` | A neutral example scenario; `scenarios/private/` is a separate private repository, git-ignored here |
 | `scripts/` | Repository tooling: documentation link check, version fields |
