@@ -21,6 +21,9 @@ log = logging.getLogger(__name__)
 
 MANIFEST = "manifest.json"
 _CHUNK = 1 << 20
+# Per socket operation (connect and each read), so an unreachable primary fails over to a
+# mirror within this long rather than hanging; the sources are fast, so reads never need more.
+_TIMEOUT_SECONDS = 30
 
 
 class FetchError(Exception):
@@ -57,6 +60,34 @@ def _write_manifest(raw_dir: Path, manifest: dict[str, Download]) -> None:
     path.write_text(text + "\n")
 
 
+def _download(spec: SourceSpec, raw_dir: Path) -> tuple[Path, str]:
+    """Download to a temporary file, falling back to each mirror if the primary cannot be reached.
+
+    Returns the temporary file and the URL it came from. A network or HTTP error on one URL moves
+    on to the next; the SHA-256 is checked by the caller, so a mirror must serve the same file.
+    """
+    failures: list[str] = []
+    for url in (spec.download_url, *spec.mirror_urls):
+        log.info("%s: downloading %s", spec.key, url)
+        request = urllib.request.Request(
+            url, headers={"User-Agent": f"stellar-explorer-pipeline/{__version__}"}
+        )
+        with tempfile.NamedTemporaryFile(dir=raw_dir, delete=False) as temporary:
+            temporary_path = Path(temporary.name)
+            try:
+                with urllib.request.urlopen(request, timeout=_TIMEOUT_SECONDS) as response:
+                    shutil.copyfileobj(response, temporary, _CHUNK)
+                return temporary_path, url
+            except OSError as error:
+                temporary_path.unlink(missing_ok=True)
+                failures.append(f"{url}: {error}")
+                log.warning("%s: could not download from %s (%s)", spec.key, url, error)
+            except BaseException:
+                temporary_path.unlink(missing_ok=True)
+                raise
+    raise FetchError(f"{spec.key}: all sources failed:\n  " + "\n  ".join(failures))
+
+
 def fetch(spec: SourceSpec, raw_dir: Path, *, refresh: bool = False) -> Download:
     """Download one source unless a verified copy is already present."""
     raw_dir.mkdir(parents=True, exist_ok=True)
@@ -71,18 +102,7 @@ def fetch(spec: SourceSpec, raw_dir: Path, *, refresh: bool = False) -> Download
             return known
         log.warning("%s: local copy does not match its manifest entry, downloading again", spec.key)
 
-    log.info("%s: downloading %s", spec.key, spec.download_url)
-    request = urllib.request.Request(
-        spec.download_url, headers={"User-Agent": f"stellar-explorer-pipeline/{__version__}"}
-    )
-    with tempfile.NamedTemporaryFile(dir=raw_dir, delete=False) as temporary:
-        temporary_path = Path(temporary.name)
-        try:
-            with urllib.request.urlopen(request, timeout=300) as response:
-                shutil.copyfileobj(response, temporary, _CHUNK)
-        except BaseException:
-            temporary_path.unlink()
-            raise
+    temporary_path, used_url = _download(spec, raw_dir)
 
     actual = sha256_of(temporary_path)
     if spec.sha256 is not None and actual != spec.sha256:
@@ -92,7 +112,7 @@ def fetch(spec: SourceSpec, raw_dir: Path, *, refresh: bool = False) -> Download
 
     temporary_path.replace(target)
     download = Download(
-        url=spec.download_url,
+        url=used_url,
         filename=spec.filename,
         sha256=actual,
         retrieved_at=datetime.now(UTC).isoformat(timespec="seconds"),

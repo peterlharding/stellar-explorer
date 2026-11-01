@@ -1,5 +1,6 @@
 #include "StellarSpikeGameMode.h"
 
+#include "BuildStamp.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 #include "GameFramework/FloatingPawnMovement.h"
@@ -61,6 +62,7 @@ void AStellarSpikeGameMode::InitGame(const FString& MapName, const FString& Opti
 
 void AStellarSpikeGameMode::StartPlay()
 {
+	UE_LOG(LogStellarSpike, Display, TEXT("Build %s on %s, built %s"), STELLAR_SPIKE_COMMIT, STELLAR_SPIKE_BRANCH, STELLAR_SPIKE_BUILT);
 	StarField = GetWorld()->SpawnActor<AStarField>();
 	GetWorld()->SpawnActor<AStarPointer>()->SetStarField(StarField);
 	if (FParse::Param(FCommandLine::Get(), TEXT("TestObject")))

@@ -8,6 +8,8 @@ All project documentation lives in this directory. The repository root keeps onl
 | [DATA-MODEL.md](DATA-MODEL.md) | The catalogue database: sources, what the pipeline does with each, preferred values, tables, querying, and the phase 1 gate |
 | [PLAN.md](PLAN.md) | The roadmap with phase gates, risks, what has been decided, and the open questions |
 | [decisions/](decisions/README.md) | Architecture decision records (ADRs), one per settled decision |
+| [BACKLOG.md](BACKLOG.md) | Features wanted but not yet scheduled into a phase |
+| [notes/](notes/) | Dated notes from planning discussions, whose outcomes are folded into the plan and the backlog |
 
 Related files outside this directory:
 

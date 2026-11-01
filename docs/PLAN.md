@@ -1,37 +1,38 @@
 # Stellar Explorer: Plan
 
-The roadmap, the risks and the questions still open. The design itself is in [ARCHITECTURE.md](ARCHITECTURE.md). When a question here is settled it becomes an ADR in [decisions/](decisions/README.md) and is removed from this file.
+The roadmap, the risks and the questions still open. The design itself is in [ARCHITECTURE.md](ARCHITECTURE.md). When a question here is settled it becomes an ADR in [decisions/](decisions/README.md) and is removed from this file. Features wanted but not yet placed in a phase are in [BACKLOG.md](BACKLOG.md).
+
+> **Engine: Unreal, pending ADR 0012.** On 30 October 2026 Unreal Engine was agreed as the engine, replacing Godot ([ADR 0007](decisions/0007-stack-core-sqlite-godot.md)), on the evidence of the [Unreal spike](../spikes/unreal-stars/README.md). The spike's Vive test has now passed (2 November 2026; see [VIVE.md](../spikes/unreal-stars/VIVE.md)), so ADR 0012 can cite that evidence too; it is written when `feature-star-panel` merges to `main`. Until then ADR 0007 stays on record, and parts of [ARCHITECTURE.md](ARCHITECTURE.md) still describe Godot. See the [direction notes](notes/2026-10-30-DIRECTION.md).
 
 ## Roadmap
 
-Seven phases, each ending in something usable, with the stack's one real risk tested at phase 3. A phase is finished when its gate passes, not when its features exist.
+Seven phases, each ending in something usable. A phase is finished when its gate passes, not when its features exist.
 
 ```mermaid
 flowchart LR
-    p1["1 Data<br/>foundation"] --> p2["2 Desktop<br/>app"] --> p3{{"3 Headsets<br/>Vision Pro go/no-go"}} --> p4["4 Time and<br/>analysis"] --> p5["5 Ships"] --> p6["6 Tours<br/>and play"] --> p7["7 Scale-up"]
+    p1["1 Data<br/>foundation"] --> p2["2 Desktop<br/>app"] --> p3["3 Headsets"] --> p4["4 Time and<br/>analysis"] --> p5["5 Ships"] --> p6["6 Tours<br/>and play"] --> p7["7 Scale-up"]
 ```
 
 | Phase | Delivers | Gate |
 | --- | --- | --- |
 | 1 Data foundation | Ingest pipeline; `catalogue.sqlite` with stars, planets and sources | Distances and positions for a test list of well-known stars match published values; every row has a source |
-| 2 Desktop app | Star renderer, fly-through, picking, provenance panel | The full 120,000-star catalogue renders smoothly |
-| 3 Headsets | Vive through OpenXR; Vision Pro trial build | The Vive build holds its refresh rate; a fully immersive Godot build runs on the Vision Pro. **Go or no-go on Godot for Vision Pro** |
+| 2 Desktop app | The Unreal spike grown into the application, on the C++ core: star renderer, fly-through, picking, provenance panel | The full 120,000-star catalogue renders smoothly |
+| 3 Headsets | Vive through OpenXR; the Vision Pro build | The Vive build holds its refresh rate; the Vision Pro build reaches feature parity with the desktop |
 | 4 Time and analysis | Star motion, filters, HR diagram, SQL console | Time scrubbing, HR diagram, filters and SQL console all drive one shared selection |
 | 5 Ships | Worldlines, three clocks, course plotter, bridge view | Core tests reproduce known relativistic travel times; a ship follows a multi-leg course on the time slider |
 | 6 Tours and play | Tours, missions, discovery log | One complete narrated tour and one mission chain run on all three platforms |
 | 7 Scale-up | AT-HYG at 2.5 million stars, then a Gaia octree | 2.5 million stars hold headset frame rate; the octree design is proven on a Gaia sample |
 
 **Progress.** Phase 1's gate passes as of 25 October 2026: `make catalogue` builds the catalogue and `make gate` checks it (see [DATA-MODEL.md](DATA-MODEL.md#the-gate)).
-
-If the Vision Pro trial fails its gate, phases 4 to 7 continue on desktop and Vive while the Vision Pro front end is rebuilt as a native Metal shell over the same core.
+The [Unreal spike](../spikes/unreal-stars/README.md) renders the whole catalogue at 120 fps on the Mac and about 95 fps in full immersion on the Vision Pro (30 October 2026), which retires phase 3's old go/no-go on the Vision Pro. Its Vive test has now passed (2 November 2026): the spike builds and runs on the Vive Pro 2, and a controller points and its trigger selects a star ([VIVE.md](../spikes/unreal-stars/VIVE.md)). A spike on voice commands is next.
 
 ## Risks
 
-The one risk that could change the stack is Godot's immersive rendering on Vision Pro; everything else is a matter of scope and tuning.
+With the Vision Pro shown working in the spike, no remaining risk is expected to change the stack; what is left is scope, tuning, and the limits of the engine as Epic ships it.
 
 | Risk | Why it matters | Mitigation |
 | --- | --- | --- |
-| Godot immersive on Vision Pro is new | Apple announced the plugins for visionOS 27 in 2026. The announcement was found, but no independent report of how well they work | Test on the headset in phase 3, before building features. Fallbacks: a native Metal shell over the same core, or Unity |
+| The launcher engine's limits on Vision Pro | Foveation (sharpness), the system's control in view, the splash window and multiview are in engine code that ships precompiled ([spike history](../spikes/unreal-stars/VISIONOS.md)) | Accept them for now; build Unreal from source if sharpness proves to matter in use |
 | Standalone Vision Pro performance | Far less GPU than a PC | Per-platform star budget; Mac-rendered streaming as a second route |
 | Scope | Exhibit, database, simulator and game are four products | Phases with gates; each phase ships something usable on its own |
 | Catalogue licence | HYG and AT-HYG are CC BY-SA 4.0 | Keep attribution in the `source` table and show it in the app; publish any redistributed database under the same licence |

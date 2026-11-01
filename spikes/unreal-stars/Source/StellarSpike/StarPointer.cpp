@@ -1,5 +1,6 @@
 #include "StarPointer.h"
 
+#include "BuildStamp.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
@@ -13,8 +14,10 @@
 #include "InputCoreTypes.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Misc/CommandLine.h"
+#include "MotionControllerComponent.h"
 #include "ProceduralMeshComponent.h"
 #include "StarField.h"
+#include "StarViewerPawn.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogStarPointer, Log, All);
 
@@ -22,30 +25,67 @@ namespace
 {
 	// Lengths in Unreal units; in a headset 1 unit is 1 cm.
 	// The ray is drawn as dots from 10 cm to 3 m from the hand, spaced and sized to look
-	// even as they recede, but never smaller than 1.5 mm across.
+	// even as they recede, but never smaller than 3 mm across.
 	constexpr int32 DotCount = 18;
 	constexpr double FirstDot = 10.0;
 	constexpr double LastDot = 300.0;
-	constexpr double DotAngularDiameter = 0.0035;
-	constexpr double SmallestDot = 0.15;
+	constexpr double DotAngularDiameter = 0.007;
+	constexpr double SmallestDot = 0.3;
 	// Where the ray starts, relative to the head: about where the shoulder is.
 	constexpr double ShoulderDrop = 15.0;
 	constexpr double ShoulderWidth = 18.0;
-	// Thumb tip to index tip: closer than this is a pinch, and it ends only when they
-	// part by more than the second, so a hand near the threshold does not flicker.
-	constexpr double PinchStart = 2.5;
-	constexpr double PinchEnd = 4.0;
-	// Pinching moves the hand, and the ray with it: select what was pointed at this long before.
-	constexpr double PinchLeadSeconds = 0.15;
-	// Angular radius of the rings around a star, and the label's distance and text height.
+	// Thumb tip to index tip: closer than PinchStart is a pinch. It ends when they part by
+	// PinchRelease from the closest they came, or beyond PinchEnd, so it ends even for a hand
+	// that rests nearly closed, and a hand near the threshold does not flicker. They must stay
+	// apart for PinchDebounceSeconds: as the tips touch they hide each other from the cameras,
+	// and the measured gap jumps for a frame or two. A hand can pinch only once seen more open
+	// than OpenGap, and each pinch must close by PinchRearm from the widest they opened since
+	// the last, so fingers still near each other as one ends do not start another; fingers
+	// pinching quickly open only partway between pinches, so PinchRearm is small.
+	// (A relaxed pointing hand rests at 4-4.5 cm.)
+	constexpr double PinchStart = 3.5;
+	constexpr double PinchRelease = 1.0;
+	constexpr double PinchDebounceSeconds = 0.1;
+	constexpr double PinchRearm = 0.6;
+	constexpr double PinchEnd = 4.5;
+	constexpr double OpenGap = 4.0;
+	// Pinching moves the hand, and the ray with it, so a pinch selects what was pointed at
+	// as thumb and index began to close: the last frame, at most PinchLookBackSeconds back,
+	// that they were within PinchOnset of their widest in that time.
+	constexpr double PinchLookBackSeconds = 0.5;
+	constexpr double PinchOnset = 0.1;
+	// How long the ray's direction takes to follow the hand, to steady it.
+	constexpr double RaySmoothingSeconds = 0.05;
+	// A controller trigger counts as a pinch past TriggerPress, and releases below TriggerRelease:
+	// the gap between them stops a trigger held near the threshold from flickering.
+	constexpr float TriggerPress = 0.6f;
+	constexpr float TriggerRelease = 0.4f;
+	// Angular radius of the rings around a star.
 	constexpr double RingDegrees = 0.7;
-	constexpr double LabelDistance = 120.0;
-	constexpr double LabelSize = 2.5;
+	// The panel: its centre's place in front of the head (forward, right, up), its size,
+	// the text heights, and how long it takes to follow the head's turns.
+	const FVector PanelOffset(100.0, 22.0, -21.0);
+	constexpr double PanelWidth = 25.0;
+	constexpr double PanelHeight = 12.0;
+	constexpr double PanelPadding = 1.6;
+	constexpr double FrameThickness = 0.12;
+	// Text heights go to SetWorldSize, which takes a float.
+	constexpr float TitleSize = 2.4f;
+	constexpr float DetailsSize = 1.8f;
+	constexpr float HintSize = 1.4f;
+	constexpr double PanelFollowSeconds = 0.12;
 	constexpr double LightYearsPerParsec = 3.26156;
 
-	const FLinearColor DotColour(0.1f, 0.18f, 0.25f);
+	// The colours as they are meant to look. The tonemapper washes bright colours out to
+	// white, so they are drawn at OverlayBrightness; and text colours are used as they are,
+	// unconverted from sRGB, so they are passed as ToFColor(false).
+	constexpr float OverlayBrightness = 0.4f;
+	const FLinearColor DotColour(0.5f, 0.75f, 1.0f);
+	const FLinearColor FrameColour(0.45f, 0.6f, 0.75f);
 	const FLinearColor HoverColour(0.3f, 0.65f, 0.9f);
 	const FLinearColor SelectionColour(1.0f, 0.7f, 0.25f);
+	const FLinearColor DetailsColour(0.65f, 0.7f, 0.75f);
+	const FLinearColor HintColour(0.5f, 0.55f, 0.6f);
 
 	/** A flat ring in the plane facing +X, of radius 1, each triangle in both windings. */
 	void BuildRing(UProceduralMeshComponent* Ring)
@@ -77,12 +117,50 @@ namespace
 		Ring->SetVisibility(false);
 	}
 
-	/** A text rotation that faces a viewer looking along Direction, upright for them. */
-	FRotator FacingViewer(const FVector& Direction)
+	/**
+	 * A point on the panel, from its centre, as the viewer sees it. The panel faces the viewer
+	 * along its +X, as text does, so the viewer's right is its -Y.
+	 */
+	FVector OnPanel(double Right, double Up)
 	{
-		// Text faces along its +X; Rotation() keeps roll at zero, so the text stays upright
-		// relative to the horizon even when the star is far above or below.
-		return (-Direction).Rotation();
+		return FVector(0.0, -Right, Up);
+	}
+
+	/** The panel's outline: a rectangle Width by Height of thin bars, each triangle in both windings. */
+	void BuildFrame(UProceduralMeshComponent* Frame, double Width, double Height, double Thickness)
+	{
+		TArray<FVector> Vertices;
+		TArray<int32> Triangles;
+		const auto Bar = [&](double Left, double Bottom, double Right, double Top)
+		{
+			const int32 A = Vertices.Num();
+			Vertices.Append({OnPanel(Left, Bottom), OnPanel(Right, Bottom), OnPanel(Right, Top), OnPanel(Left, Top)});
+			Triangles.Append({A, A + 1, A + 2, A, A + 2, A + 3});
+			Triangles.Append({A, A + 2, A + 1, A, A + 3, A + 2});
+		};
+		const double X = Width / 2.0;
+		const double Y = Height / 2.0;
+		Bar(-X, Y - Thickness, X, Y);
+		Bar(-X, -Y, X, -Y + Thickness);
+		Bar(-X, -Y + Thickness, -X + Thickness, Y - Thickness);
+		Bar(X - Thickness, -Y + Thickness, X, Y - Thickness);
+		const TArray<FVector> NoNormals;
+		const TArray<FVector2D> NoUVs;
+		const TArray<FColor> NoColours;
+		const TArray<FProcMeshTangent> NoTangents;
+		Frame->CreateMeshSection(0, Vertices, Triangles, NoNormals, NoUVs, NoColours, NoTangents, false);
+		Frame->SetCastShadow(false);
+		Frame->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	/** A distance, with fewer decimals the larger it is. */
+	FString FormatDistance(double Value)
+	{
+		if (Value < 10.0)
+		{
+			return FString::Printf(TEXT("%.2f"), Value);
+		}
+		return Value < 1000.0 ? FString::Printf(TEXT("%.1f"), Value) : FString::Printf(TEXT("%.0f"), Value);
 	}
 
 	IHandTracker* FindHandTracker()
@@ -101,29 +179,44 @@ namespace
 AStarPointer::AStarPointer()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	// After the camera has followed the head this frame, so the rays start where the hands are.
+	// After the camera has followed the head this frame, so the ray starts where the hand is.
 	PrimaryActorTick.TickGroup = TG_PostUpdateWork;
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
-	for (int32 Hand = 0; Hand < 2; ++Hand)
-	{
-		Dots[Hand] = CreateDefaultSubobject<UInstancedStaticMeshComponent>(Hand == 0 ? TEXT("FirstRay") : TEXT("SecondRay"));
-		Dots[Hand]->SetupAttachment(RootComponent);
-		Dots[Hand]->SetMobility(EComponentMobility::Movable);
-		Dots[Hand]->SetCastShadow(false);
-		Dots[Hand]->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		Dots[Hand]->SetVisibility(false);
-	}
+	Dots = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Ray"));
+	Dots->SetupAttachment(RootComponent);
+	Dots->SetMobility(EComponentMobility::Movable);
+	Dots->SetCastShadow(false);
+	Dots->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Dots->SetVisibility(false);
 	HoverRing = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("HoverRing"));
 	HoverRing->SetupAttachment(RootComponent);
 	SelectionRing = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("SelectionRing"));
 	SelectionRing->SetupAttachment(RootComponent);
-	Label = CreateDefaultSubobject<UTextRenderComponent>(TEXT("Label"));
-	Label->SetupAttachment(RootComponent);
-	Label->SetHorizontalAlignment(EHTA_Center);
-	Label->SetVerticalAlignment(EVRTA_TextTop);
-	Label->SetWorldSize(LabelSize);
-	Label->SetTextRenderColor(SelectionColour.ToFColor(true));
-	Label->SetVisibility(false);
+	Panel = CreateDefaultSubobject<USceneComponent>(TEXT("Panel"));
+	Panel->SetupAttachment(RootComponent);
+	Frame = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("Frame"));
+	Frame->SetupAttachment(Panel);
+	// The name at the top left, inside the frame, with the details below it.
+	const FVector TopLeft = OnPanel(-PanelWidth / 2.0 + PanelPadding, PanelHeight / 2.0 - PanelPadding);
+	Title = CreateDefaultSubobject<UTextRenderComponent>(TEXT("Title"));
+	Title->SetupAttachment(Panel);
+	Title->SetRelativeLocation(TopLeft);
+	Title->SetWorldSize(TitleSize);
+	Details = CreateDefaultSubobject<UTextRenderComponent>(TEXT("Details"));
+	Details->SetupAttachment(Panel);
+	Details->SetRelativeLocation(TopLeft + OnPanel(0.0, -TitleSize * 1.3));
+	Details->SetWorldSize(DetailsSize);
+	Details->SetTextRenderColor((DetailsColour * OverlayBrightness).ToFColor(false));
+	Hint = CreateDefaultSubobject<UTextRenderComponent>(TEXT("Hint"));
+	Hint->SetupAttachment(Panel);
+	Hint->SetRelativeLocation(OnPanel(-PanelWidth / 2.0 + PanelPadding, -PanelHeight / 2.0 + PanelPadding + HintSize));
+	Hint->SetWorldSize(HintSize);
+	Hint->SetTextRenderColor((HintColour * OverlayBrightness).ToFColor(false));
+	for (UTextRenderComponent* Text : {Title.Get(), Details.Get(), Hint.Get()})
+	{
+		Text->SetHorizontalAlignment(EHTA_Left);
+		Text->SetVerticalAlignment(EVRTA_TextTop);
+	}
 }
 
 void AStarPointer::BeginPlay()
@@ -135,20 +228,62 @@ void AStarPointer::BeginPlay()
 	BuildRing(SelectionRing);
 	HoverRing->SetMaterial(0, ColouredMaterial(HoverColour));
 	SelectionRing->SetMaterial(0, ColouredMaterial(SelectionColour));
+	BuildFrame(Frame, PanelWidth, PanelHeight, FrameThickness);
+	Frame->SetMaterial(0, ColouredMaterial(FrameColour));
 	if (UMaterialInterface* Text = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/M_Label.M_Label")))
 	{
-		Label->SetTextMaterial(Text);
+		Title->SetTextMaterial(Text);
+		Details->SetTextMaterial(Text);
+		Hint->SetTextMaterial(Text);
 	}
 	UStaticMesh* Sphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
-	for (UInstancedStaticMeshComponent* Ray : Dots)
+	Dots->SetStaticMesh(Sphere);
+	Dots->SetMaterial(0, ColouredMaterial(DotColour));
+	for (int32 Dot = 0; Dot < DotCount; ++Dot)
 	{
-		Ray->SetStaticMesh(Sphere);
-		Ray->SetMaterial(0, ColouredMaterial(DotColour));
-		for (int32 Dot = 0; Dot < DotCount; ++Dot)
+		Dots->AddInstance(FTransform::Identity, true);
+	}
+
+	// The desktop's view centre always points; there is nothing to turn on.
+	bPointingStarted = !bHeadset;
+	FParse::Value(FCommandLine::Get(), TEXT("PointingHand="), PointingHand);
+	FParse::Value(FCommandLine::Get(), TEXT("GestureGate="), GestureGateSeconds);
+	FParse::Value(FCommandLine::Get(), TEXT("DoublePinch="), DoublePinchSeconds);
+	FParse::Value(FCommandLine::Get(), TEXT("RightTriggerKey="), RightTriggerKey);
+	FParse::Value(FCommandLine::Get(), TEXT("LeftTriggerKey="), LeftTriggerKey);
+	bLogInput = FParse::Param(FCommandLine::Get(), TEXT("LogInput"));
+	if (!bHeadset)
+	{
+		Pointer = MouseHand;
+	}
+	else if (PointingHand.Equals(TEXT("Left"), ESearchCase::IgnoreCase))
+	{
+		Pointer = 0;
+	}
+	else if (!PointingHand.Equals(TEXT("Right"), ESearchCase::IgnoreCase))
+	{
+		UE_LOG(LogStarPointer, Warning, TEXT("PointingHand is \"%s\", not Right or Left: pointing with the right"), *PointingHand);
+	}
+	UE_LOG(LogStarPointer, Display, TEXT("Pointing with hand %d; pinches ignored for %.2f s after a star is kept or let go; two within %.2f s let it go"), Pointer,
+		GestureGateSeconds, DoublePinchSeconds);
+
+#if PLATFORM_WINDOWS
+	// With -LogInput, list the controller input keys the engine registered, so a new controller's
+	// exact trigger name can be seen and set in Config/Windows/WindowsInput.ini.
+	if (bLogInput)
+	{
+		TArray<FKey> AllKeys;
+		EKeys::GetAllKeys(AllKeys);
+		for (const FKey& Key : AllKeys)
 		{
-			Ray->AddInstance(FTransform::Identity, true);
+			const FString KeyName = Key.ToString();
+			if (KeyName.Contains(TEXT("Trigger")) || KeyName.Contains(TEXT("MotionController")))
+			{
+				UE_LOG(LogStarPointer, Display, TEXT("Available input key: %s"), *KeyName);
+			}
 		}
 	}
+#endif
 }
 
 UMaterialInstanceDynamic* AStarPointer::ColouredMaterial(const FLinearColor& Colour)
@@ -160,28 +295,52 @@ UMaterialInstanceDynamic* AStarPointer::ColouredMaterial(const FLinearColor& Col
 		return nullptr;
 	}
 	UMaterialInstanceDynamic* Instance = UMaterialInstanceDynamic::Create(Material, this);
-	Instance->SetVectorParameterValue(TEXT("Colour"), Colour);
+	Instance->SetVectorParameterValue(TEXT("Colour"), Colour * OverlayBrightness);
 	return Instance;
 }
 
 TArray<AStarPointer::FRay, TInlineAllocator<2>> AStarPointer::GetRays(const FVector& Head, const FRotator& HeadRotation)
 {
 	TArray<FRay, TInlineAllocator<2>> Rays;
+	const double Now = GetWorld()->GetRealTimeSeconds();
 	if (!bHeadset)
 	{
 		const APlayerController* Player = GetWorld()->GetFirstPlayerController();
-		Rays.Add({Head, HeadRotation.Vector(), Player && Player->IsInputKeyDown(EKeys::LeftMouseButton), MouseHand});
+		// A click is a pinch that closes at once: open until the frame it happens.
+		const bool bClicked = Player && Player->IsInputKeyDown(EKeys::LeftMouseButton);
+		Rays.Add({Head, HeadRotation.Vector(), bClicked, MouseHand, bClicked ? 0.0 : PinchEnd});
 		return Rays;
 	}
+	// Prefer motion controllers when one is tracked (the Vive); otherwise hand tracking (the Vision
+	// Pro). The Vive's runtime reports a valid hand tracker even with controllers in use, so the
+	// controller check comes first. Gated to Windows because on the Vision Pro the aim pose comes
+	// from the hands and must not be mistaken for a controller.
+#if PLATFORM_WINDOWS
+	const bool bController = AnyControllerTracked();
+#else
+	const bool bController = false;
+#endif
 	const IHandTracker* Tracker = FindHandTracker();
+	const int32 Mode = bController ? 2 : (Tracker != nullptr ? 1 : 0);
+	if (Mode != LoggedInputMode)
+	{
+		UE_LOG(LogStarPointer, Display, TEXT("Headset input: controller tracked=%d, hand tracker=%d -> %s"), bController, Tracker != nullptr,
+			bController ? TEXT("controllers") : (Tracker != nullptr ? TEXT("hands") : TEXT("none")));
+		LoggedInputMode = Mode;
+	}
+	if (bController)
+	{
+		AppendControllerRays(Rays);
+		return Rays;
+	}
 	if (Tracker == nullptr)
 	{
 		return Rays;
 	}
+	bUsingControllers = false;
 	// The shoulders turn with the head's yaw but not its pitch or roll.
 	const FRotator Body(0.0, HeadRotation.Yaw, 0.0);
 	const FVector Right = FRotationMatrix(Body).GetUnitAxis(EAxis::Y);
-	// Right hand first, so it is the one whose star is ringed when both point.
 	for (const EControllerHand Hand : {EControllerHand::Right, EControllerHand::Left})
 	{
 		const int32 HandIndex = Hand == EControllerHand::Left ? 0 : 1;
@@ -197,14 +356,144 @@ TArray<AStarPointer::FRay, TInlineAllocator<2>> AStarPointer::GetRays(const FVec
 			State = FHand();
 			continue;
 		}
-		const FVector Knuckle = Joints[int32(EHandKeypoint::IndexProximal)];
+		// The ray passes through the middle of the hand, which moves less in a pinch than the
+		// fingers do; the index knuckle stands in if the palm is not tracked.
+		const FVector& Palm = Joints[int32(EHandKeypoint::Palm)];
+		const FVector Through = Palm.IsNearlyZero() ? Joints[int32(EHandKeypoint::IndexProximal)] : Palm;
 		const double Gap = FVector::Distance(Joints[int32(EHandKeypoint::ThumbTip)], Joints[int32(EHandKeypoint::IndexTip)]);
-		State.bSeenOpen |= Gap > PinchEnd;
-		State.bPinched = State.bSeenOpen && (State.bPinched ? Gap < PinchEnd : Gap < PinchStart);
+		const bool bWasPinched = State.bPinched;
+		State.bSeenOpen |= Gap > OpenGap;
+		if (State.bPinched)
+		{
+			State.PinchClosest = FMath::Min(State.PinchClosest, Gap);
+			if (Gap < FMath::Min(PinchEnd, State.PinchClosest + PinchRelease))
+			{
+				State.OpenSince = -1.0;
+			}
+			else if (State.OpenSince < 0.0)
+			{
+				State.OpenSince = Now;
+			}
+			State.bPinched = State.OpenSince < 0.0 || Now - State.OpenSince < PinchDebounceSeconds;
+			State.OpenWidest = Gap;
+		}
+		else if (State.bSeenOpen && Gap < PinchStart && State.OpenWidest - Gap >= PinchRearm)
+		{
+			State.bPinched = true;
+			State.PinchClosest = Gap;
+			State.OpenSince = -1.0;
+		}
+		else
+		{
+			State.OpenWidest = FMath::Max(State.OpenWidest, Gap);
+		}
+		// Log a hand that closed but not enough to pinch, to tune PinchStart by.
+		if (State.bSeenOpen && !State.bPinched && !bWasPinched && Gap < OpenGap)
+		{
+			if (State.ClosestGap == TNumericLimits<double>::Max())
+			{
+				State.DipOpenedTo = State.OpenWidest;
+			}
+			State.ClosestGap = FMath::Min(State.ClosestGap, Gap);
+		}
+		else
+		{
+			if (Gap >= OpenGap && State.ClosestGap < OpenGap)
+			{
+				UE_LOG(LogStarPointer, Display, TEXT("Near pinch with hand %d: thumb to index %.1f cm at closest, after opening to %.1f cm"), HandIndex, State.ClosestGap,
+					State.DipOpenedTo);
+			}
+			State.ClosestGap = TNumericLimits<double>::Max();
+		}
 		const FVector Shoulder = Head - FVector(0.0, 0.0, ShoulderDrop) + Right * (Hand == EControllerHand::Left ? -ShoulderWidth : ShoulderWidth);
-		Rays.Add({Knuckle, (Knuckle - Shoulder).GetSafeNormal(), State.bPinched, HandIndex, Gap});
+		const FVector Direction = (Through - Shoulder).GetSafeNormal();
+		const double Follow = 1.0 - FMath::Exp(-GetWorld()->GetDeltaSeconds() / RaySmoothingSeconds);
+		State.Direction = State.Direction.IsZero() ? Direction : (State.Direction + (Direction - State.Direction) * Follow).GetSafeNormal();
+		Rays.Add({Through, State.Direction, State.bPinched, HandIndex, Gap});
 	}
 	return Rays;
+}
+
+bool AStarPointer::AnyControllerTracked() const
+{
+	const APlayerController* Player = GetWorld()->GetFirstPlayerController();
+	const AStarViewerPawn* Viewer = Player ? Cast<AStarViewerPawn>(Player->GetPawn()) : nullptr;
+	if (Viewer == nullptr)
+	{
+		return false;
+	}
+	for (int32 Hand = 0; Hand < 2; ++Hand)
+	{
+		const UMotionControllerComponent* Controller = Viewer->GetHandController(Hand);
+		if (Controller != nullptr && Controller->IsTracked())
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+void AStarPointer::AppendControllerRays(TArray<FRay, TInlineAllocator<2>>& Rays)
+{
+	const APlayerController* Player = GetWorld()->GetFirstPlayerController();
+	const AStarViewerPawn* Viewer = Player ? Cast<AStarViewerPawn>(Player->GetPawn()) : nullptr;
+	if (Viewer == nullptr)
+	{
+		return;
+	}
+	const double Now = GetWorld()->GetRealTimeSeconds();
+	const bool bLog = bLogInput && Now >= NextControllerLog;
+	// Point with a tracked controller: the configured hand if its controller is tracked, otherwise
+	// the other, so a single controller works whichever hand holds it (and a sleeping one is not
+	// pointed with). Derive the preference from PointingHand, which is stable, not from Pointer,
+	// which this reassigns.
+	const int32 Configured = PointingHand.Equals(TEXT("Left"), ESearchCase::IgnoreCase) ? 0 : 1;
+	const UMotionControllerComponent* ConfiguredController = Viewer->GetHandController(Configured);
+	const UMotionControllerComponent* OtherController = Viewer->GetHandController(1 - Configured);
+	if (ConfiguredController != nullptr && ConfiguredController->IsTracked())
+	{
+		Pointer = Configured;
+	}
+	else if (OtherController != nullptr && OtherController->IsTracked())
+	{
+		Pointer = 1 - Configured;
+	}
+	// Right first then left, as the hand path adds them, so the pointing hand's index matches.
+	for (const int32 HandIndex : {1, 0})
+	{
+		FHand& State = Hands[HandIndex];
+		const UMotionControllerComponent* Controller = Viewer->GetHandController(HandIndex);
+		if (Controller == nullptr || !Controller->IsTracked())
+		{
+			State = FHand();
+			continue;
+		}
+		bUsingControllers = true;
+		// The trigger key is device-specific, so poll each candidate and take the largest value.
+		const FString& TriggerKeys = HandIndex == 0 ? LeftTriggerKey : RightTriggerKey;
+		TArray<FString> KeyNames;
+		TriggerKeys.ParseIntoArray(KeyNames, TEXT(","));
+		float Trigger = 0.0f;
+		for (const FString& KeyName : KeyNames)
+		{
+			Trigger = FMath::Max(Trigger, Player->GetInputAnalogKeyState(FKey(*KeyName.TrimStartAndEnd())));
+		}
+		// Hysteresis around the press threshold; State.bPinched carries between frames.
+		State.bPinched = State.bPinched ? Trigger > TriggerRelease : Trigger > TriggerPress;
+		if (bLog)
+		{
+			UE_LOG(LogStarPointer, Display, TEXT("Controller hand %d: trigger [%s] = %.2f, pinched %d"), HandIndex, *TriggerKeys, Trigger, State.bPinched);
+		}
+		// The ray is the controller's aim pose. A controller barely moves as the trigger is pulled,
+		// so, unlike a hand, it needs no smoothing and no look-back: Gap is 0 while pulled and
+		// PinchEnd otherwise, which keeps the selection logic in Tick selecting what is pointed at.
+		const double Gap = State.bPinched ? 0.0 : PinchEnd;
+		Rays.Add({Controller->GetComponentLocation(), Controller->GetForwardVector(), State.bPinched, HandIndex, Gap});
+	}
+	if (bLog)
+	{
+		NextControllerLog = Now + 1.0;
+	}
 }
 
 void AStarPointer::Tick(float DeltaSeconds)
@@ -222,53 +511,82 @@ void AStarPointer::Tick(float DeltaSeconds)
 	const double Now = GetWorld()->GetRealTimeSeconds();
 	Hovered = INDEX_NONE;
 	int32 Pinched = 0;
-	for (int32 Index = 0; Index < 2; ++Index)
+	bool bPointing = false;
+	for (const FRay& Ray : Rays)
 	{
-		const bool bShown = bHeadset && Rays.IsValidIndex(Index);
-		Dots[Index]->SetVisibility(bShown);
-		if (!Rays.IsValidIndex(Index))
+		FHand& State = Hands[Ray.Hand];
+		Pinched += Ray.bPinched ? 1 : 0;
+		// The other hand only counts towards the gesture that quits.
+		if (Ray.Hand != Pointer)
 		{
+			State.bWasPinched = Ray.bPinched;
 			continue;
 		}
-		const FRay& Ray = Rays[Index];
+		bPointing = true;
 		const int32 Star = StarField->FindStar(Ray.Origin, Ray.Direction, MaxPointingAngleDegrees);
-		if (Index == 0)
+		State.Recent.Add({Now, Star, Ray.Gap});
+		State.Recent.RemoveAll([Now](const FSighting& Sighting) { return Sighting.Time < Now - PinchLookBackSeconds; });
+		// A pinch (or click) that has just started keeps what this ray pointed at as the
+		// fingers began to close; with a star kept, two in quick succession let it go.
+		if (Ray.bPinched && !State.bWasPinched)
+		{
+			double Widest = 0.0;
+			for (const FSighting& Sighting : State.Recent)
+			{
+				Widest = FMath::Max(Widest, Sighting.Gap);
+			}
+			int32 Before = State.Recent[0].Star;
+			for (const FSighting& Sighting : State.Recent)
+			{
+				if (Sighting.Gap >= Widest - PinchOnset)
+				{
+					Before = Sighting.Star;
+				}
+			}
+			UE_LOG(LogStarPointer, Display, TEXT("Pinch with hand %d, thumb to index %.1f cm (widest %.1f): pointing at %d now, %d before"), Ray.Hand, Ray.Gap,
+				Widest, Star, Before);
+			if (Now < GateUntil)
+			{
+				UE_LOG(LogStarPointer, Display, TEXT("Pinch ignored: %.2f s after the ray was turned on or a star was kept or let go"),
+					Now - (GateUntil - GestureGateSeconds));
+			}
+			else if (!bPointingStarted)
+			{
+				UE_LOG(LogStarPointer, Display, TEXT("Pointing started"));
+				bPointingStarted = true;
+				GateUntil = Now + GestureGateSeconds;
+			}
+			else if (Selected == INDEX_NONE)
+			{
+				Select(Before);
+			}
+			else if (Now - LastKeptPinch < DoublePinchSeconds)
+			{
+				UE_LOG(LogStarPointer, Display, TEXT("Second pinch %.2f s after the first: letting the star go"), Now - LastKeptPinch);
+				Select(INDEX_NONE);
+			}
+			else
+			{
+				LastKeptPinch = Now;
+			}
+		}
+		State.bWasPinched = Ray.bPinched;
+
+		// A kept star holds the panel, and the ray goes until the star is let go.
+		if (bPointingStarted && Selected == INDEX_NONE)
 		{
 			Hovered = Star;
-		}
-		if (bShown)
-		{
 			for (int32 Dot = 0; Dot < DotCount; ++Dot)
 			{
 				const double Distance = FirstDot * FMath::Pow(LastDot / FirstDot, double(Dot) / (DotCount - 1));
 				const double Diameter = FMath::Max(SmallestDot, Distance * DotAngularDiameter);
 				// The basic sphere is 100 units across.
-				Dots[Index]->UpdateInstanceTransform(Dot, FTransform(FQuat::Identity, Ray.Origin + Ray.Direction * Distance, FVector(Diameter / 100.0)),
+				Dots->UpdateInstanceTransform(Dot, FTransform(FQuat::Identity, Ray.Origin + Ray.Direction * Distance, FVector(Diameter / 100.0)),
 					true, Dot == DotCount - 1, true);
 			}
 		}
-		Pinched += Ray.bPinched ? 1 : 0;
-
-		FHand& State = Hands[Ray.Hand];
-		State.Recent.Add({Now, Star});
-		State.Recent.RemoveAll([Now](const TPair<double, int32>& Entry) { return Entry.Key < Now - 4.0 * PinchLeadSeconds; });
-		// A pinch (or click) that has just started selects what this ray pointed at just
-		// before, or clears the selection.
-		if (Ray.bPinched && !State.bWasPinched)
-		{
-			int32 Before = State.Recent[0].Value;
-			for (const TPair<double, int32>& Entry : State.Recent)
-			{
-				if (Entry.Key <= Now - PinchLeadSeconds)
-				{
-					Before = Entry.Value;
-				}
-			}
-			UE_LOG(LogStarPointer, Display, TEXT("Pinch with hand %d, thumb to index %.1f cm: pointing at %d now, %d before"), Ray.Hand, Ray.Gap, Star, Before);
-			Select(Before);
-		}
-		State.bWasPinched = Ray.bPinched;
 	}
+	Dots->SetVisibility(bHeadset && bPointing && bPointingStarted && Selected == INDEX_NONE);
 	// A hand that is no longer tracked has no pinch to continue.
 	for (FHand& State : Hands)
 	{
@@ -290,12 +608,14 @@ void AStarPointer::Tick(float DeltaSeconds)
 
 	PlaceRing(HoverRing, Hovered != Selected ? Hovered : INDEX_NONE, Head);
 	PlaceRing(SelectionRing, Selected, Head);
-	PlaceLabel(Head, HeadRotation);
+	PlacePanel(Head, HeadRotation, DeltaSeconds);
 }
 
 void AStarPointer::Select(int32 Star)
 {
 	Selected = Star;
+	GateUntil = GetWorld()->GetRealTimeSeconds() + GestureGateSeconds;
+	LastKeptPinch = -1.0e9;
 	if (Star == INDEX_NONE)
 	{
 		UE_LOG(LogStarPointer, Display, TEXT("Selection cleared"));
@@ -318,40 +638,60 @@ void AStarPointer::PlaceRing(UProceduralMeshComponent* Ring, int32 Star, const F
 	Ring->SetWorldScale3D(FVector(Distance * FMath::Tan(FMath::DegreesToRadians(RingDegrees))));
 }
 
-void AStarPointer::PlaceLabel(const FVector& Head, const FRotator& HeadRotation)
+void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation, float DeltaSeconds)
 {
-	const bool bExiting = BothPinchedSeconds > 0.0;
-	Label->SetVisibility(Selected != INDEX_NONE || bExiting);
-	if (bExiting)
+	// The panel turns with the head a little behind it, which is steadier to read than one
+	// fixed to the view, and keeps its distance as the head moves.
+	const FQuat Target = HeadRotation.Quaternion();
+	PanelRotation = bPanelPlaced ? FQuat::Slerp(PanelRotation, Target, 1.0 - FMath::Exp(-DeltaSeconds / PanelFollowSeconds)) : Target;
+	bPanelPlaced = true;
+	// Facing back along the view, as text faces along its +X.
+	Panel->SetWorldLocationAndRotation(Head + PanelRotation.RotateVector(PanelOffset), PanelRotation * FQuat(FVector::UpVector, PI));
+
+	if (BothPinchedSeconds > 0.0)
 	{
-		// In front of the viewer, wherever they look.
-		const FVector Position = Head + HeadRotation.Vector() * LabelDistance;
-		Label->SetText(FText::FromString(FString::Printf(TEXT("Keep pinching to exit: %.0f"), FMath::CeilToDouble(HoldToExitSeconds - BothPinchedSeconds))));
-		Label->SetWorldLocationAndRotation(Position, FacingViewer(HeadRotation.Vector()));
+		Title->SetText(FText::FromString(bUsingControllers ? TEXT("Hold both triggers to exit") : TEXT("Keep pinching to exit")));
+		Title->SetTextRenderColor((SelectionColour * OverlayBrightness).ToFColor(false));
+		Details->SetText(FText::FromString(FString::Printf(TEXT("Exiting in %.0f s"), FMath::CeilToDouble(HoldToExitSeconds - BothPinchedSeconds))));
+		Hint->SetText(FText::GetEmpty());
 		return;
 	}
-	if (Selected == INDEX_NONE)
+	if (Selected != INDEX_NONE)
 	{
+		ShowStar(Selected, SelectionColour);
+		Hint->SetText(FText::FromString(!bHeadset ? TEXT("Double-click to let it go")
+				: bUsingControllers               ? TEXT("Pull the trigger twice to let it go")
+												  : TEXT("Pinch twice to let it go")));
 		return;
 	}
-	const FVector Star = StarField->GetPosition(Selected);
-	const double Distance = FVector::Distance(Star, Head);
+	Hint->SetText(FText::FromString(!bPointingStarted ? (bUsingControllers ? TEXT("Then pull the trigger again to keep a star") : TEXT("Then pinch again to keep a star"))
+			: !bHeadset                             ? TEXT("Click to keep a star")
+			: bUsingControllers                     ? TEXT("Pull the trigger to keep a star, both to exit")
+													: TEXT("Pinch to keep a star, both hands to exit")));
+	if (Hovered != INDEX_NONE)
+	{
+		ShowStar(Hovered, HoverColour);
+		return;
+	}
+	Title->SetText(FText::FromString(!bPointingStarted ? (bUsingControllers ? TEXT("Pull the trigger to start pointing") : TEXT("Pinch to start pointing"))
+			: bHeadset                              ? TEXT("Point at a star")
+													: TEXT("Look at a star")));
+	Title->SetTextRenderColor((HintColour * OverlayBrightness).ToFColor(false));
+	// With nothing to describe, the build, so a session can be matched to its code.
+	Details->SetText(FText::FromString(FString::Printf(TEXT("Build %s\n%s, %s"), STELLAR_SPIKE_COMMIT, STELLAR_SPIKE_BRANCH, STELLAR_SPIKE_BUILT)));
+}
+
+void AStarPointer::ShowStar(int32 Star, const FLinearColor& Colour)
+{
+	const APlayerController* Player = GetWorld()->GetFirstPlayerController();
+	const double Distance = FVector::Distance(StarField->GetPosition(Star), Player->PlayerCameraManager->GetCameraLocation());
 	const double Parsecs = Distance / AStarField::UnitsPerParsec;
-	const FString& Type = StarField->GetSpectralType(Selected);
-	FString Text = StarField->GetName(Selected);
-	if (!Type.IsEmpty())
-	{
-		Text += TEXT("\n") + Type;
-	}
 	// Rounded first, and +0.0 so that a magnitude like -0.01 shows as 0.0, not -0.0.
-	const double Magnitude = FMath::RoundToDouble(AStarField::ApparentMagnitude(StarField->GetAbsoluteMagnitude(Selected), Distance) * 10.0) / 10.0 + 0.0;
-	Text += FString::Printf(TEXT("\n%.2f pc (%.1f ly) from here\nmagnitude %.1f"), Parsecs, Parsecs * LightYearsPerParsec, Magnitude);
-	Label->SetText(FText::FromString(Text));
-	// Just below the star as seen from here, near enough to read, and square on to the
-	// viewer however far up or down the star is.
-	const FVector Direction = (Star - Head).GetSafeNormal();
-	const FRotator Facing = FacingViewer(Direction);
-	const FVector Up = FRotationMatrix(Facing).GetUnitAxis(EAxis::Z);
-	const FVector Position = Head + Direction * LabelDistance - Up * LabelSize * 1.5;
-	Label->SetWorldLocationAndRotation(Position, Facing);
+	const double Magnitude = FMath::RoundToDouble(AStarField::ApparentMagnitude(StarField->GetAbsoluteMagnitude(Star), Distance) * 10.0) / 10.0 + 0.0;
+	const FString& Type = StarField->GetSpectralType(Star);
+	FString Text = Type.IsEmpty() ? FString() : Type + TEXT(", ");
+	Text += FString::Printf(TEXT("magnitude %.1f\n%s pc (%s ly) from here"), Magnitude, *FormatDistance(Parsecs), *FormatDistance(Parsecs * LightYearsPerParsec));
+	Title->SetText(FText::FromString(StarField->GetName(Star)));
+	Title->SetTextRenderColor((Colour * OverlayBrightness).ToFColor(false));
+	Details->SetText(FText::FromString(Text));
 }

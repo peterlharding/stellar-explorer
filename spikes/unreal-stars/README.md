@@ -39,17 +39,54 @@ Problems met and fixed on the way, worth knowing for the real app:
 
 ### Part 2: Vision Pro (runs in full immersion)
 
-Getting there took eight fixes, recorded with their evidence in [VISIONOS.md](VISIONOS.md).
+Reaching full immersion took eight fixes (sections 1 to 9 of [VISIONOS.md](VISIONOS.md), with their evidence); sections 10 to 16 cover what came after: the stars made visible, tuning, and the pointer and panel.
 The ones that matter for the real app: package with `-pak`; start the engine from `VisionOSStartup.cpp`, because the launcher engine's scene lifecycle never starts in a SwiftUI app; override the Vision Pro device profile's `r.Mobile.XRMSAAMode`; keep SQLite's temporary tables in memory; and declare the tracking usage descriptions in `Info.plist`.
 
 
 - **Platform files.** The iOS and visionOS target platforms are optional downloads in the Epic Games Launcher (the engine's Installation Options, Target Platforms; visionOS requires iOS). The launcher will not change an engine while any of its editors is running: it defers the install silently, so close every Unreal Editor first.
 - **Toolchain.** With the OpenXR visionOS plugin enabled, the spike compiles and links for visionOS with Xcode 27.1 and the visionOS 27.0 SDK, although Unreal 5.8 states only "Xcode 15.3 or later". The build then stops at signing, which needs the developer's team in `Config/UserEngine.ini` (`[/Script/MacTargetPlatform.XcodeProjectSettings]`, `CodeSigningTeam=`).
-- **Working:** the whole sky in full immersion at about 95 frames a second, and a hand pointer that names the star it points at; see [VISIONOS.md](VISIONOS.md), sections 12 to 14.
+- **Working:** the whole sky in full immersion at about 95 frames a second, and a hand pointer whose panel describes the star it points at; see [VISIONOS.md](VISIONOS.md), sections 12 to 16.
 
-### Part 3: HTC Vive Pro 2 on Windows (not started)
+### Part 3: HTC Vive Pro 2 on Windows (runs, controllers pointing)
+
+On PLH's Windows 11 PC, driven from WSL.
+Needs Unreal 5.8.4 for Windows, Visual Studio with the C++ game workload, HTC's VIVE OpenXR runtime, and Python with `uv` in WSL.
+
+```sh
+cd /mnt/d/src/Projects/stellar-explorer   # on a Windows drive, not in WSL's own filesystem
+make catalogue                            # builds data/catalogue.sqlite
+cd spikes/unreal-stars
+./spike.sh build && ./spike.sh material
+./spike.sh run                            # on the monitor first
+./spike.sh vive                           # then in the headset
+```
+
+`spike.sh` calls Unreal's Windows programs when it finds itself under WSL; `UE_ROOT` overrides the engine's place if it is not under `C:\Program Files\Epic Games\UE_5.8`.
+
+Reaching the headset took six fixes (see [VIVE.md](VIVE.md), with their evidence). The ones that matter for the real app: build the catalogue through a mirror when CDS is unreachable from WSL; gate the OpenXR visionOS plugin to Apple platforms so the Windows editor starts; disable OpenXR 1.1, because the VIVE runtime is 1.0-only; check the motion controllers before hand tracking, because the runtime reports a hand tracker even with controllers in use; and bind the device-specific trigger axes (Vive and Valve Index), because OpenXR delivers a trigger value only to a bound action.
+
+**Working:** the whole catalogue renders in the headset, a controller points and its trigger selects a star, and the panel adapts its wording to the trigger; see [VIVE.md](VIVE.md).
+
+### Part 4: Voice commands (not started, after the Vive)
+
+Can the app be driven by speech — a handful of verbs and a few dozen star names, including awkward ones like "Delta Pavonis" — accurately and fast enough to be worth building, on both headsets, ideally with one offline recogniser? It runs after the Vive test so it can be tried on both. See the [direction notes](../../docs/notes/2026-10-30-DIRECTION.md) (F9).
+
+Scope: fixed commands mapped to the actions that already exist; star and cluster name recognition. Out of scope: natural-language questions turned into SQL (that is the queryable catalogue, [ADR 0004](../../docs/decisions/0004-extensible-queryable-catalogue.md), phase 4); the spike only shows it is not precluded.
+
+The lasting output is not the voice code but an **action registry**: each action — Keep, Go there, Examine, Return to the Sun, Take a picture, a grid on or off — is one named command, called alike by the panel, the gestures and the voice, so voice adds a new way in, not new behaviour.
+
+What it settles, with evidence, as the Vive test settles ADR 0012:
+
+- **Two recognition routes compared** on both headsets: each platform's own recogniser (Apple's `Speech` framework on the Vision Pro, Windows speech recognition on the PC) against one on-device model (Whisper through an Unreal plugin), for accuracy on star names, delay from speech to action, and — verified first, because it can sink the single-model plan — whether the plugin builds for visionOS at all. Both are tested with and without biasing toward the known vocabulary.
+- **The names.** The catalogue stores names as catalogues write them (`del Pav`, not "Delta Pavonis"; Alpha Centauri only as Rigil Kentaurus and Toliman), so the pipeline adds spoken forms to the `identifier` table and the recogniser matches against those. A fixed corpus of ~8 verbs and ~30 names, easy and hard, plus "the Pleiades" (needs the cluster catalogue from F6), is the scoring set.
+- **Starting to listen:** a wake word against a gesture that opens the microphone, tried in the headset; never always-listening. The panel echoes what it heard before acting.
+- **Permissions:** microphone and speech-recognition usage descriptions in the Vision Pro's `Info.plist`, as for hand tracking; the microphone permission Windows needs.
+
+The point of it (PLH): speech makes the app more accessible — to anyone for whom pinches or controllers are awkward, and to anyone who knows a star's name but not where it is.
 
 ## Still to judge
 
-- Stars look right but are understated: the brightest stars need a bloom or glare that reads as brilliance, and the exposure wants tuning in a headset, not on a monitor.
-- Ready for the headsets, untested in them: the pawn's camera follows the headset, and in a headset the view starts 1.5 m from the Sun at 1 pc to 1 m, so α Centauri is 1.3 m away. Forward shading, MSAA, instanced stereo and mobile multiview are on; `Config/VisionOS` and `Config/Windows` start the app in VR; the catalogue is staged into packages as a plain file.
+- Stars look right but are understated: the brightest stars need a bloom or glare that reads as brilliance.
+  The headset exposure is tuned (0.25 on the Vision Pro); the Vive's is not yet.
+- On the Vive the app starts in VR, the view starts 1.5 m from the Sun (1 pc to 1 m, so α Centauri is 1.3 m away), and the controller pointer works ([VIVE.md](VIVE.md)).
+  Still to tune there: the star exposure, and a clean in-headset frame-rate figure, since the first run was busy compiling shaders.

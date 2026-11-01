@@ -22,6 +22,9 @@ class SourceSpec:
     # that changes over time (the exoplanet archive) has none, and its hash is
     # recorded when it is fetched instead.
     sha256: str | None
+    # Mirrors tried, in order, when download_url cannot be reached. For a fixed
+    # source each must serve the identical file, so the sha256 above still holds.
+    mirror_urls: tuple[str, ...] = ()
 
 
 HYG = SourceSpec(
@@ -49,6 +52,9 @@ HIPPARCOS = SourceSpec(
     download_url="https://cdsarc.cds.unistra.fr/ftp/I/311/hip2.dat.gz",
     filename="hip2.dat.gz",
     sha256="8e624f843d4254a9b7c2e8dda8e3158dbe825bf98f6bf3dbbae7f0d0b73d6858",
+    # CDS can be unreachable from some networks; the Harvard VizieR mirror serves the
+    # byte-identical file (same sha256), so the cited source stays CDS I/311.
+    mirror_urls=("https://vizier.cfa.harvard.edu/ftp/cats/I/311/hip2.dat.gz",),
 )
 
 # Planet parameters that carry an upper and lower uncertainty, a limit flag and
