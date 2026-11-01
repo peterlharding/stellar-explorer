@@ -33,7 +33,7 @@ What this makes easy, what it makes hard, and what would cause it to be revisite
 
 | Number | Title | Status |
 | --- | --- | --- |
-| [0001](0001-native-app-three-targets.md) | A native application for desktop, HTC Vive and Apple Vision Pro | Accepted |
+| [0001](0001-native-app-three-targets.md) | A native application for desktop, HTC Vive and Apple Vision Pro | Accepted; desktop scope narrowed by [0013](0013-target-platforms.md) |
 | [0002](0002-bright-star-scale-designed-to-grow.md) | Start at bright-star scale, designed to grow | Accepted |
 | [0003](0003-scientific-exhibit-with-provenance.md) | A scientific exhibit, with provenance on every value | Accepted |
 | [0004](0004-extensible-queryable-catalogue.md) | An extensible, queryable catalogue that includes exoplanets | Accepted |
@@ -45,3 +45,4 @@ What this makes easy, what it makes hard, and what would cause it to be revisite
 | [0010](0010-public-repository-private-scenarios.md) | A public repository, with book-based scenarios kept outside it | Accepted |
 | [0011](0011-astrometry-from-hipparcos.md) | Star astrometry from the Hipparcos New Reduction, not HYG | Accepted |
 | [0012](0012-unreal-front-end.md) | Unreal Engine 5.8 as the front end, replacing Godot | Accepted |
+| [0013](0013-target-platforms.md) | Target platforms: Windows x64, macOS arm64 and visionOS (no Linux, no Intel) | Accepted |
