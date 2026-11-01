@@ -57,6 +57,7 @@ Each settled decision is an ADR in [decisions/](decisions/README.md).
 | [0011](decisions/0011-astrometry-from-hipparcos.md) | Star astrometry from the Hipparcos New Reduction, not HYG | 25 October 2026 |
 | [0012](decisions/0012-unreal-front-end.md) | Unreal Engine 5.8 as the front end, replacing Godot | 2 November 2026 |
 | [0013](decisions/0013-target-platforms.md) | Target platforms: Windows x64, macOS arm64 and visionOS (no Linux, no Intel) | 2 November 2026 |
+| [0014](decisions/0014-core-as-linked-library.md) | The core as a standalone library linked into the Unreal front end | 2 November 2026 |
 
 ## Open questions
 

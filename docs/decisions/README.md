@@ -46,3 +46,4 @@ What this makes easy, what it makes hard, and what would cause it to be revisite
 | [0011](0011-astrometry-from-hipparcos.md) | Star astrometry from the Hipparcos New Reduction, not HYG | Accepted |
 | [0012](0012-unreal-front-end.md) | Unreal Engine 5.8 as the front end, replacing Godot | Accepted |
 | [0013](0013-target-platforms.md) | Target platforms: Windows x64, macOS arm64 and visionOS (no Linux, no Intel) | Accepted |
+| [0014](0014-core-as-linked-library.md) | The core as a standalone library linked into the Unreal front end | Accepted |
