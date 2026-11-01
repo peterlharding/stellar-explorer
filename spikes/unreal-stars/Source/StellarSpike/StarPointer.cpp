@@ -251,6 +251,7 @@ void AStarPointer::BeginPlay()
 	FParse::Value(FCommandLine::Get(), TEXT("DoublePinch="), DoublePinchSeconds);
 	FParse::Value(FCommandLine::Get(), TEXT("RightTriggerKey="), RightTriggerKey);
 	FParse::Value(FCommandLine::Get(), TEXT("LeftTriggerKey="), LeftTriggerKey);
+	bLogInput = FParse::Param(FCommandLine::Get(), TEXT("LogInput"));
 	if (!bHeadset)
 	{
 		Pointer = MouseHand;
@@ -265,6 +266,24 @@ void AStarPointer::BeginPlay()
 	}
 	UE_LOG(LogStarPointer, Display, TEXT("Pointing with hand %d; pinches ignored for %.2f s after a star is kept or let go; two within %.2f s let it go"), Pointer,
 		GestureGateSeconds, DoublePinchSeconds);
+
+#if PLATFORM_WINDOWS
+	// With -LogInput, list the controller input keys the engine registered, so a new controller's
+	// exact trigger name can be seen and set in Config/Windows/WindowsInput.ini.
+	if (bLogInput)
+	{
+		TArray<FKey> AllKeys;
+		EKeys::GetAllKeys(AllKeys);
+		for (const FKey& Key : AllKeys)
+		{
+			const FString KeyName = Key.ToString();
+			if (KeyName.Contains(TEXT("Trigger")) || KeyName.Contains(TEXT("MotionController")))
+			{
+				UE_LOG(LogStarPointer, Display, TEXT("Available input key: %s"), *KeyName);
+			}
+		}
+	}
+#endif
 }
 
 UMaterialInstanceDynamic* AStarPointer::ColouredMaterial(const FLinearColor& Colour)
@@ -292,11 +311,30 @@ TArray<AStarPointer::FRay, TInlineAllocator<2>> AStarPointer::GetRays(const FVec
 		Rays.Add({Head, HeadRotation.Vector(), bClicked, MouseHand, bClicked ? 0.0 : PinchEnd});
 		return Rays;
 	}
+	// Prefer motion controllers when one is tracked (the Vive); otherwise hand tracking (the Vision
+	// Pro). The Vive's runtime reports a valid hand tracker even with controllers in use, so the
+	// controller check comes first. Gated to Windows because on the Vision Pro the aim pose comes
+	// from the hands and must not be mistaken for a controller.
+#if PLATFORM_WINDOWS
+	const bool bController = AnyControllerTracked();
+#else
+	const bool bController = false;
+#endif
 	const IHandTracker* Tracker = FindHandTracker();
+	const int32 Mode = bController ? 2 : (Tracker != nullptr ? 1 : 0);
+	if (Mode != LoggedInputMode)
+	{
+		UE_LOG(LogStarPointer, Display, TEXT("Headset input: controller tracked=%d, hand tracker=%d -> %s"), bController, Tracker != nullptr,
+			bController ? TEXT("controllers") : (Tracker != nullptr ? TEXT("hands") : TEXT("none")));
+		LoggedInputMode = Mode;
+	}
+	if (bController)
+	{
+		AppendControllerRays(Rays);
+		return Rays;
+	}
 	if (Tracker == nullptr)
 	{
-		// No hand tracking: a headset with controllers (the Vive), or none yet.
-		AppendControllerRays(Rays);
 		return Rays;
 	}
 	bUsingControllers = false;
@@ -376,6 +414,25 @@ TArray<AStarPointer::FRay, TInlineAllocator<2>> AStarPointer::GetRays(const FVec
 	return Rays;
 }
 
+bool AStarPointer::AnyControllerTracked() const
+{
+	const APlayerController* Player = GetWorld()->GetFirstPlayerController();
+	const AStarViewerPawn* Viewer = Player ? Cast<AStarViewerPawn>(Player->GetPawn()) : nullptr;
+	if (Viewer == nullptr)
+	{
+		return false;
+	}
+	for (int32 Hand = 0; Hand < 2; ++Hand)
+	{
+		const UMotionControllerComponent* Controller = Viewer->GetHandController(Hand);
+		if (Controller != nullptr && Controller->IsTracked())
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 void AStarPointer::AppendControllerRays(TArray<FRay, TInlineAllocator<2>>& Rays)
 {
 	const APlayerController* Player = GetWorld()->GetFirstPlayerController();
@@ -385,7 +442,22 @@ void AStarPointer::AppendControllerRays(TArray<FRay, TInlineAllocator<2>>& Rays)
 		return;
 	}
 	const double Now = GetWorld()->GetRealTimeSeconds();
-	const bool bLog = Now >= NextControllerLog;
+	const bool bLog = bLogInput && Now >= NextControllerLog;
+	// Point with a tracked controller: the configured hand if its controller is tracked, otherwise
+	// the other, so a single controller works whichever hand holds it (and a sleeping one is not
+	// pointed with). Derive the preference from PointingHand, which is stable, not from Pointer,
+	// which this reassigns.
+	const int32 Configured = PointingHand.Equals(TEXT("Left"), ESearchCase::IgnoreCase) ? 0 : 1;
+	const UMotionControllerComponent* ConfiguredController = Viewer->GetHandController(Configured);
+	const UMotionControllerComponent* OtherController = Viewer->GetHandController(1 - Configured);
+	if (ConfiguredController != nullptr && ConfiguredController->IsTracked())
+	{
+		Pointer = Configured;
+	}
+	else if (OtherController != nullptr && OtherController->IsTracked())
+	{
+		Pointer = 1 - Configured;
+	}
 	// Right first then left, as the hand path adds them, so the pointing hand's index matches.
 	for (const int32 HandIndex : {1, 0})
 	{
@@ -397,14 +469,20 @@ void AStarPointer::AppendControllerRays(TArray<FRay, TInlineAllocator<2>>& Rays)
 			continue;
 		}
 		bUsingControllers = true;
-		const FKey TriggerKey(*(HandIndex == 0 ? LeftTriggerKey : RightTriggerKey));
-		const float Trigger = Player->GetInputAnalogKeyState(TriggerKey);
+		// The trigger key is device-specific, so poll each candidate and take the largest value.
+		const FString& TriggerKeys = HandIndex == 0 ? LeftTriggerKey : RightTriggerKey;
+		TArray<FString> KeyNames;
+		TriggerKeys.ParseIntoArray(KeyNames, TEXT(","));
+		float Trigger = 0.0f;
+		for (const FString& KeyName : KeyNames)
+		{
+			Trigger = FMath::Max(Trigger, Player->GetInputAnalogKeyState(FKey(*KeyName.TrimStartAndEnd())));
+		}
 		// Hysteresis around the press threshold; State.bPinched carries between frames.
 		State.bPinched = State.bPinched ? Trigger > TriggerRelease : Trigger > TriggerPress;
 		if (bLog)
 		{
-			UE_LOG(LogStarPointer, Display, TEXT("Controller hand %d: trigger \"%s\" = %.2f, pinched %d"), HandIndex,
-				*(HandIndex == 0 ? LeftTriggerKey : RightTriggerKey), Trigger, State.bPinched);
+			UE_LOG(LogStarPointer, Display, TEXT("Controller hand %d: trigger [%s] = %.2f, pinched %d"), HandIndex, *TriggerKeys, Trigger, State.bPinched);
 		}
 		// The ray is the controller's aim pose. A controller barely moves as the trigger is pulled,
 		// so, unlike a hand, it needs no smoothing and no look-back: Gap is 0 while pulled and

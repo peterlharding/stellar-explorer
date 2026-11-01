@@ -89,6 +89,8 @@ private:
 	TArray<FRay, TInlineAllocator<2>> GetRays(const FVector& Head, const FRotator& HeadRotation);
 	/** The rays from motion controllers, when the headset has those instead of hand tracking. */
 	void AppendControllerRays(TArray<FRay, TInlineAllocator<2>>& Rays);
+	/** Whether either motion controller is tracked this frame, without disturbing the hand state. */
+	bool AnyControllerTracked() const;
 	void Select(int32 Star);
 	void PlaceRing(UProceduralMeshComponent* Ring, int32 Star, const FVector& Head) const;
 	void PlacePanel(const FVector& Head, const FRotator& HeadRotation, float DeltaSeconds);
@@ -114,16 +116,16 @@ private:
 	float DoublePinchSeconds = 1.0f;
 
 	/**
-	 * The keys the controllers' triggers appear as, when the headset has controllers (the Vive).
-	 * The exact name depends on the controller and is settled by the Vive test: the log prints the
-	 * live value, and -RightTriggerKey= / -LeftTriggerKey= try another without a rebuild.
-	 * Candidates if the generic name is empty: ValveIndex_*_Trigger_Click, HTCViveController_*_Trigger.
+	 * The keys a controller's trigger appears as, when the headset has controllers (the Vive). The
+	 * keys are device-specific, so each is a comma-separated list tried in turn, the largest value
+	 * winning: a Vive wand and a Valve Index controller use different names. -RightTriggerKey= /
+	 * -LeftTriggerKey= override without a rebuild; -LogInput lists every key the engine registered.
 	 */
 	UPROPERTY(Config)
-	FString RightTriggerKey = TEXT("MotionController_Right_Trigger");
+	FString RightTriggerKey = TEXT("Vive_Right_Trigger_Axis,ValveIndex_Right_Trigger_Axis");
 
 	UPROPERTY(Config)
-	FString LeftTriggerKey = TEXT("MotionController_Left_Trigger");
+	FString LeftTriggerKey = TEXT("Vive_Left_Trigger_Axis,ValveIndex_Left_Trigger_Axis");
 
 	/** The pointing hand's ray, drawn as dots. */
 	UPROPERTY()
@@ -170,8 +172,12 @@ private:
 	bool bHeadset = false;
 	/** Set once a tracked controller is seen, so the panel says "trigger" rather than "pinch". */
 	bool bUsingControllers = false;
-	/** Throttles the trigger-value log that the Vive test reads to confirm the key name. */
+	/** -LogInput: dump the registered input keys and log trigger values each second, for bring-up. */
+	bool bLogInput = false;
+	/** Throttles the per-second trigger-value log that -LogInput turns on. */
 	double NextControllerLog = 0.0;
+	/** The input mode last logged (0 none, 1 hands, 2 controllers), so a change is logged just once. */
+	int32 LoggedInputMode = -1;
 
 	static constexpr double MaxPointingAngleDegrees = 2.0;
 	static constexpr double HoldToExitSeconds = 2.0;
