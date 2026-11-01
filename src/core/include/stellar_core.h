@@ -20,7 +20,7 @@ extern "C" {
 #endif
 
 /* ABI version of this library; a caller checks it matches this header. */
-#define STC_ABI_VERSION 1u
+#define STC_ABI_VERSION 2u
 uint32_t stc_abi_version(void);
 
 /* A position in parsecs, right-handed ICRS equatorial Cartesian. POD, by value. */
@@ -49,16 +49,25 @@ StcVec3 stc_icrs_position(double ra_deg, double dec_deg, double distance_pc);
 /* An opaque handle to an open catalogue. */
 typedef struct StcCatalogue StcCatalogue;
 
-/* One star: identity, position (parsecs, right-handed ICRS), and photometry.
- * Names and spectral types (strings) are not yet carried across the boundary. */
+/* Capacities (including the NUL terminator) of the fixed string fields in StcStar.
+ * Values longer than this from the catalogue are truncated. Names fit comfortably;
+ * spectral types are short (e.g. "M5.5Ve"). Fixed arrays keep StcStar plain data in
+ * the caller's buffer — no per-string allocation or lifetime to manage. */
+#define STC_NAME_CAP 64
+#define STC_SPECTRAL_CAP 24
+
+/* One star: identity, position (parsecs, right-handed ICRS), photometry, and the
+ * display strings. All by value in the caller's buffer. */
 typedef struct StcStar
 {
 	int64_t id;
 	double x;
 	double y;
 	double z;
-	double absmag; /* absolute visual magnitude */
-	double teff;   /* effective temperature, kelvin (5800 when the catalogue has none) */
+	double absmag;                        /* absolute visual magnitude */
+	double teff;                          /* effective temperature, kelvin (5800 when the catalogue has none) */
+	char name[STC_NAME_CAP];              /* NUL-terminated; truncated if longer */
+	char spectral_type[STC_SPECTRAL_CAP]; /* NUL-terminated; empty when the catalogue has none */
 } StcStar;
 
 /* Open the catalogue at `path` read-only; returns NULL if it cannot be opened. */
