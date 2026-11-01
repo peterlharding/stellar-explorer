@@ -4,10 +4,10 @@
 PIPELINE := src/pipeline
 RUN := cd $(PIPELINE) && uv run --locked
 
-.PHONY: check lint typecheck test docs version-check version-set fetch catalogue gate
+.PHONY: check lint typecheck test core docs version-check version-set fetch catalogue gate
 
 ## Every automated check. Must pass, with no warnings, before a release.
-check: lint typecheck test docs version-check
+check: lint typecheck test core docs version-check
 
 lint:
 	$(RUN) ruff format --check . ../../scripts ../../spikes/unreal-stars/Scripts
@@ -18,6 +18,12 @@ typecheck:
 
 test:
 	$(RUN) pytest
+
+## Build the engine-independent core and run its tests (ADR 0008; no engine needed).
+core:
+	cmake -S src/core -B src/core/build
+	cmake --build src/core/build
+	ctest --test-dir src/core/build --output-on-failure
 
 docs:
 	python3 -I scripts/check_docs.py

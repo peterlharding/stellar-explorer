@@ -136,7 +136,7 @@ Because the core has no engine dependency, it gets ordinary unit tests: known st
 | `data/` | Downloaded catalogues and built databases; git-ignored |
 | `release_notes/` | One user-facing file per release |
 
-Only `docs/`, `src/pipeline/`, `scripts/` and `release_notes/` exist so far; the rest appear with the phase that needs them.
+Only `docs/`, `src/pipeline/`, `src/core/`, `scripts/` and `release_notes/` exist so far; the rest appear with the phase that needs them.
 
 ## Data and database
 
