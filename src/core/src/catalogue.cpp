@@ -8,12 +8,31 @@ namespace stellar::core
 	{
 		// Stars usable by the renderer: a position and an absolute magnitude (the Sun is
 		// at the origin). Matches the query the spike's StarField runs against the `star`
-		// view; teff defaults to 5800 K when the catalogue has none.
+		// view; teff defaults to 5800 K and spectral_type to empty when absent.
 		constexpr const char* kSelectStars =
-			"SELECT id, x, y, z, absmag, coalesce(teff, 5800) "
+			"SELECT id, x, y, z, absmag, coalesce(teff, 5800), name, coalesce(spectral_type, '') "
 			"FROM star WHERE x IS NOT NULL AND absmag IS NOT NULL";
 		constexpr const char* kCountStars =
 			"SELECT count(*) FROM star WHERE x IS NOT NULL AND absmag IS NOT NULL";
+
+		// Copy a SQLite text column into a fixed field: truncated to fit, always
+		// NUL-terminated, empty when the column is NULL.
+		void copy_text(char* dst, int capacity, const unsigned char* src)
+		{
+			if (capacity <= 0)
+			{
+				return;
+			}
+			int i = 0;
+			if (src != nullptr)
+			{
+				for (; i < capacity - 1 && src[i] != '\0'; ++i)
+				{
+					dst[i] = static_cast<char>(src[i]);
+				}
+			}
+			dst[i] = '\0';
+		}
 	}
 
 	Catalogue* Catalogue::open(const char* path)
@@ -76,6 +95,8 @@ namespace stellar::core
 			s.z = sqlite3_column_double(stmt, 3);
 			s.absmag = sqlite3_column_double(stmt, 4);
 			s.teff = sqlite3_column_double(stmt, 5);
+			copy_text(s.name, STC_NAME_CAP, sqlite3_column_text(stmt, 6));
+			copy_text(s.spectral_type, STC_SPECTRAL_CAP, sqlite3_column_text(stmt, 7));
 			++written;
 		}
 		sqlite3_finalize(stmt);
