@@ -38,6 +38,43 @@ double stc_distance_parsecs(double parallax_mas);
  * (degrees) and distance (parsecs). */
 StcVec3 stc_icrs_position(double ra_deg, double dec_deg, double distance_pc);
 
+/* ---- Catalogue ------------------------------------------------------------
+ *
+ * The star catalogue (one SQLite file, built offline by the pipeline), opened
+ * read-only. The handle is opaque: only pointers to it cross the boundary, and
+ * the core owns its lifetime (open / close). Star rows come back as POD, by
+ * value in a caller-provided buffer; the core allocates nothing the caller frees.
+ */
+
+/* An opaque handle to an open catalogue. */
+typedef struct StcCatalogue StcCatalogue;
+
+/* One star: identity, position (parsecs, right-handed ICRS), and photometry.
+ * Names and spectral types (strings) are not yet carried across the boundary. */
+typedef struct StcStar
+{
+	int64_t id;
+	double x;
+	double y;
+	double z;
+	double absmag; /* absolute visual magnitude */
+	double teff;   /* effective temperature, kelvin (5800 when the catalogue has none) */
+} StcStar;
+
+/* Open the catalogue at `path` read-only; returns NULL if it cannot be opened. */
+StcCatalogue* stc_catalogue_open(const char* path);
+
+/* Close a catalogue opened by stc_catalogue_open. NULL is ignored. */
+void stc_catalogue_close(StcCatalogue* catalogue);
+
+/* How many stars have both a position and an absolute magnitude (the ones
+ * stc_catalogue_load_stars returns); negative on error. */
+int64_t stc_catalogue_star_count(const StcCatalogue* catalogue);
+
+/* Fill up to `capacity` stars into `out`, returning the number written, or a
+ * negative value on error. Call stc_catalogue_star_count first to size `out`. */
+int32_t stc_catalogue_load_stars(const StcCatalogue* catalogue, StcStar* out, int32_t capacity);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
