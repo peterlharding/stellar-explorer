@@ -1,7 +1,9 @@
 # Unreal spike: the catalogue in Unreal Engine 5.8
 
-A throwaway project that answers one question before ADR 0007 (Godot) is reconsidered: can Unreal Engine render the Stellar Explorer catalogue well, on the desktop, the HTC Vive Pro 2 and the Apple Vision Pro?
-It is not the app; the app will live in `src/app/` once the engine is decided.
+> **Graduated.** Unreal was chosen ([ADR 0012](../../docs/decisions/0012-unreal-front-end.md)) and the project moved to [`src/app/`](../../src/app/README.md); run it from there now. This directory is kept as the record of the spike's bring-up — the README below, with [VISIONOS.md](VISIONOS.md) and [VIVE.md](VIVE.md).
+
+A throwaway project that answered one question before ADR 0007 (Godot) was reconsidered: can Unreal Engine render the Stellar Explorer catalogue well, on the desktop, the HTC Vive Pro 2 and the Apple Vision Pro?
+It was not the app itself; once Unreal was chosen the project graduated to `src/app/` (see the note above).
 
 ## How it is built
 
@@ -55,7 +57,7 @@ Needs Unreal 5.8.4 for Windows, Visual Studio with the C++ game workload, HTC's 
 ```sh
 cd /mnt/d/src/Projects/stellar-explorer   # on a Windows drive, not in WSL's own filesystem
 make catalogue                            # builds data/catalogue.sqlite
-cd spikes/unreal-stars
+cd src/app
 ./spike.sh build && ./spike.sh material
 ./spike.sh run                            # on the monitor first
 ./spike.sh vive                           # then in the headset
