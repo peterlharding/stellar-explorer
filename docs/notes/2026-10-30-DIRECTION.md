@@ -59,7 +59,7 @@ The Vive test runs on PLH's Windows 11 PC, from a checkout of this repository.
 To get there:
 
 - The spike's work must be on GitHub: done, `feature-star-panel` was pushed on 30 October.
-- The setup and commands are in the spike's README, [Part 3](../../spikes/unreal-stars/README.md#part-3-htc-vive-pro-2-on-windows-not-started); the points below are why it is set up that way.
+- The setup and commands are in the spike's README, [Part 3](../../spikes/unreal-stars/README.md#part-3-htc-vive-pro-2-on-windows-runs-controllers-pointing); the points below are why it is set up that way.
 - Unreal 5.8.4 for Windows, Visual Studio with the C++ game workload, and SteamVR for the Vive.
 - PLH works in WSL on Windows, so `spike.sh` runs there too: under WSL it calls Unreal's Windows programs (`UnrealBuildTool.exe`, `UnrealEditor.exe`) with paths translated by `wslpath`, and has a `vive` command that starts the game in the headset through SteamVR.
 - The checkout lives on the Windows drive, at `D:\src\Projects\stellar-explorer` (`/mnt/d/src/Projects/stellar-explorer` in WSL): Unreal and Visual Studio are slow with, and sometimes break on, paths inside WSL's own filesystem.

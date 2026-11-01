@@ -1,7 +1,7 @@
 # 0007. Engine-independent core, SQLite catalogue, Godot 4 front end
 
 Date: 2026-10-25
-Status: Accepted
+Status: Superseded by [0012](0012-unreal-front-end.md) (its Godot front end only; the core and SQLite catalogue stand)
 
 ## Context
 

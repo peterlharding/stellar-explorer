@@ -2,7 +2,7 @@
 
 The roadmap, the risks and the questions still open. The design itself is in [ARCHITECTURE.md](ARCHITECTURE.md). When a question here is settled it becomes an ADR in [decisions/](decisions/README.md) and is removed from this file. Features wanted but not yet placed in a phase are in [BACKLOG.md](BACKLOG.md).
 
-> **Engine: Unreal, pending ADR 0012.** On 30 October 2026 Unreal Engine was agreed as the engine, replacing Godot ([ADR 0007](decisions/0007-stack-core-sqlite-godot.md)), on the evidence of the [Unreal spike](../spikes/unreal-stars/README.md). The spike's Vive test has now passed (2 November 2026; see [VIVE.md](../spikes/unreal-stars/VIVE.md)), so ADR 0012 can cite that evidence too; it is written when `feature-star-panel` merges to `main`. Until then ADR 0007 stays on record, and parts of [ARCHITECTURE.md](ARCHITECTURE.md) still describe Godot. See the [direction notes](notes/2026-10-30-DIRECTION.md).
+> **Engine: Unreal ([ADR 0012](decisions/0012-unreal-front-end.md)), replacing Godot ([ADR 0007](decisions/0007-stack-core-sqlite-godot.md)).** Agreed on 30 October 2026 on the evidence of the [Unreal spike](../spikes/unreal-stars/README.md), and settled on 2 November 2026 once the spike's Vive test passed ([VIVE.md](../spikes/unreal-stars/VIVE.md)). The engine-independent core and the SQLite catalogue carry over unchanged; only the front end changes. Parts of [ARCHITECTURE.md](ARCHITECTURE.md) still describe the Godot stack and are updated as the application is built from the spike. See the [direction notes](notes/2026-10-30-DIRECTION.md).
 
 ## Roadmap
 
@@ -50,11 +50,12 @@ Each settled decision is an ADR in [decisions/](decisions/README.md).
 | [0004](decisions/0004-extensible-queryable-catalogue.md) | An extensible, queryable catalogue that includes exoplanets | 3 October 2026 |
 | [0005](decisions/0005-relativistic-starships-and-scenarios.md) | Relativistic starships and scenarios | 3 October 2026 |
 | [0006](decisions/0006-optional-game-layer.md) | A game layer, optional and on top | 3 October 2026 |
-| [0007](decisions/0007-stack-core-sqlite-godot.md) | Engine-independent core, SQLite catalogue, Godot 4 front end | 25 October 2026 |
+| [0007](decisions/0007-stack-core-sqlite-godot.md) | Engine-independent core, SQLite catalogue, Godot 4 front end (front end superseded by 0012) | 25 October 2026 |
 | [0008](decisions/0008-core-in-cpp.md) | The core library is written in C++ | 25 October 2026 |
 | [0009](decisions/0009-personal-tool.md) | A personal tool, not a public installation | 25 October 2026 |
 | [0010](decisions/0010-public-repository-private-scenarios.md) | A public repository, with book-based scenarios kept outside it | 25 October 2026 |
 | [0011](decisions/0011-astrometry-from-hipparcos.md) | Star astrometry from the Hipparcos New Reduction, not HYG | 25 October 2026 |
+| [0012](decisions/0012-unreal-front-end.md) | Unreal Engine 5.8 as the front end, replacing Godot | 2 November 2026 |
 
 ## Open questions
 
