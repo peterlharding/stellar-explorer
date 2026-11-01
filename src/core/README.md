@@ -46,9 +46,33 @@ This produces, under `src/core/build-msvc/Release/`:
 
 The ThirdParty Unreal module links **both** and adds `include/` to its include paths. (Matching Unreal's exact CRT and build flags is settled when that module is wired up.)
 
-## macOS / visionOS
+## macOS and visionOS static libraries (for Unreal)
 
-Built on the Mac with CMake and the Apple toolchain (`aarch64-apple-darwin`, and the visionOS SDK). Deferred until the Unreal wiring moves to the Mac.
+Built on the Mac with the **Xcode generator**, into `<build>/Release/` to match the Win64 layout. The app's ThirdParty module (`src/app/Source/StellarCore/StellarCore.Build.cs`) expects, per [ADR 0013](../../docs/decisions/0013-target-platforms.md):
+
+- macOS (Apple silicon): `src/core/build-mac/Release/{libstellar_core.a, libsqlite3.a}`
+- visionOS (device): `src/core/build-visionos/Release/{libstellar_core.a, libsqlite3.a}`
+
+### macOS (arm64)
+
+```sh
+cmake -S src/core -B src/core/build-mac -G Xcode -DCMAKE_OSX_ARCHITECTURES=arm64
+cmake --build src/core/build-mac --config Release
+ctest --test-dir src/core/build-mac -C Release --output-on-failure   # tests run natively
+```
+
+### visionOS (device)
+
+```sh
+cmake -S src/core -B src/core/build-visionos -G Xcode \
+  -DCMAKE_SYSTEM_NAME=visionOS -DCMAKE_OSX_SYSROOT=xros -DCMAKE_OSX_ARCHITECTURES=arm64 \
+  -DSTELLAR_CORE_TESTS=OFF
+cmake --build src/core/build-visionos --config Release
+```
+
+Needs CMake ≥ 3.28 (visionOS support) and the visionOS SDK. Tests are off because their executables are device binaries that cannot run on the host. If the Unreal link later complains, match UE's visionOS **deployment target** (add `-DCMAKE_OSX_DEPLOYMENT_TARGET=<version>`). For the **simulator**, use `-DCMAKE_OSX_SYSROOT=xrsimulator` into `build-visionos-sim/` and wire that path in `StellarCore.Build.cs` when the simulator is targeted.
+
+This is the least-trodden path — expect some iteration — but the C ABI seam ([ADR 0014](../../docs/decisions/0014-core-as-linked-library.md)) means it is only a matter of producing a valid arm64 archive; nothing in the boundary depends on the toolchain.
 
 ## The boundary
 
