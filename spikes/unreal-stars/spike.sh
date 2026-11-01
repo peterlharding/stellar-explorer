@@ -6,6 +6,7 @@
 #   ./spike.sh measure    circle the Sun for 30 s, log frame times, take a screenshot
 #   ./spike.sh look RA,DEC  screenshot the sky from the Sun, e.g. 5.6,0 for Orion
 #   ./spike.sh vive       run in the headset through SteamVR (Windows)
+#   ./spike.sh package    cook a standalone build so shaders ship (no first-run wait)
 #   ./spike.sh visionos   package for Apple Vision Pro (needs CodeSigningTeam in Config/UserEngine.ini)
 #   ./spike.sh install UDID   install the packaged app on a paired Vision Pro
 # Under WSL the checkout must be on a Windows drive (/mnt/c, /mnt/d), where Unreal's
@@ -20,6 +21,8 @@ if grep -qi microsoft /proc/version 2>/dev/null; then
 	EDITOR="$UE/Engine/Binaries/Win64/UnrealEditor.exe"
 	EDITOR_CMD="$UE/Engine/Binaries/Win64/UnrealEditor-Cmd.exe"
 	BUILD_TOOL="$UE/Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.exe"
+	UAT="$UE/Engine/Binaries/DotNET/AutomationTool/AutomationTool.exe"
+	STAGE=Windows
 	native() { wslpath -w "$1"; }
 	case "$HERE" in
 	/mnt/[a-z]/*) ;;
@@ -34,6 +37,8 @@ else
 	EDITOR="$UE/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor"
 	EDITOR_CMD="$UE/Engine/Binaries/Mac/UnrealEditor-Cmd"
 	BUILD_TOOL="$UE/Engine/Build/BatchFiles/Mac/Build.sh"
+	UAT="$UE/Engine/Build/BatchFiles/RunUAT.sh"
+	STAGE=Mac
 	native() { echo "$1"; }
 fi
 PROJECT="$(native "$HERE/StellarSpike.uproject")"
@@ -85,6 +90,21 @@ look)
 vive)
 	# -vr starts OpenXR, which uses SteamVR when SteamVR is the active OpenXR runtime.
 	"$EDITOR" "$PROJECT" -game -vr -log
+	;;
+package)
+	# Cook and package a standalone build for this desktop platform, so the
+	# shaders ship in the package and the first run no longer spends ~27 min
+	# compiling them, and it runs without the editor. The catalogue travels as a
+	# plain file in Content/Data (DefaultGame.ini stages it); staging merges into
+	# what is there, so start clean. Needs the generated materials: run
+	# ./spike.sh material first.
+	rm -rf "$HERE/Saved/StagedBuilds/$STAGE" "$HERE/Saved/Archive/$STAGE"
+	stamp
+	mkdir -p "$HERE/Content/Data"
+	cp "$HERE/../../data/catalogue.sqlite" "$HERE/Content/Data/catalogue.sqlite"
+	"$UAT" BuildCookRun -project="$PROJECT" -platform="$PLATFORM" \
+		-clientconfig=Development -build -cook -stage -pak -iostore -package -archive \
+		-archivedirectory="$(native "$HERE/Saved/Archive")" -nocompileeditor -utf8output
 	;;
 visionos)
 	mac_only visionos
