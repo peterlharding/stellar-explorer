@@ -5,11 +5,10 @@
 #include "HAL/FileManager.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Paths.h"
-#include "Misc/ScopeExit.h"
 #include "Engine/Engine.h"
 #include "IXRTrackingSystem.h"
 #include "ProceduralMeshComponent.h"
-#include "SQLiteDatabase.h"
+#include "StarCatalogue.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogStarField, Log, All);
 
@@ -95,27 +94,15 @@ void AStarField::BeginPlay()
 
 bool AStarField::LoadStars(const FString& Path)
 {
-	FSQLiteDatabase Database;
-	if (!Database.Open(*Path, ESQLiteDatabaseOpenMode::ReadOnly))
+	// Catalogue access lives in the engine-independent core now (ADR 0014), reached through
+	// its C ABI; FStarCatalogue wraps the handle and loads every usable star.
+	FStarCatalogue Catalogue(Path);
+	if (!Catalogue.IsOpen())
 	{
-		UE_LOG(LogStarField, Error, TEXT("Cannot open %s: %s"), *Path, *Database.GetLastError());
+		UE_LOG(LogStarField, Error, TEXT("Cannot open catalogue %s"), *Path);
 		return false;
 	}
-	// Unreal's wrapper asserts if the database is destroyed while still open.
-	ON_SCOPE_EXIT { Database.Close(); };
-	// The star view's GROUP BY needs a temporary table, which SQLite would put in a
-	// file; an app on visionOS has nowhere it may write one by default.
-	Database.Execute(TEXT("PRAGMA temp_store = MEMORY"));
-
-	// Stars with a position and an absolute magnitude; the Sun is at the origin.
-	FSQLitePreparedStatement Statement = Database.PrepareStatement(
-		TEXT("SELECT x, y, z, absmag, coalesce(teff, 5800), name, coalesce(spectral_type, '') FROM star WHERE x IS NOT NULL AND absmag IS NOT NULL"));
-	if (!Statement.IsValid())
-	{
-		UE_LOG(LogStarField, Error, TEXT("Query failed: %s"), *Database.GetLastError());
-		return false;
-	}
-	ON_SCOPE_EXIT { Statement.Destroy(); };
+	const TArray<StcStar>& Stars = Catalogue.Stars();
 
 	TArray<FVector> Vertices;
 	TArray<int32> Triangles;
@@ -124,43 +111,37 @@ bool AStarField::LoadStars(const FString& Path)
 	TArray<FLinearColor> Colours;
 	const FVector2D CornerOffsets[4] = {{-1.0, -1.0}, {1.0, -1.0}, {1.0, 1.0}, {-1.0, 1.0}};
 
-	const int64 Rows = Statement.Execute([&](const FSQLitePreparedStatement& Row)
-	{
-		double X = 0.0, Y = 0.0, Z = 0.0, AbsMag = 0.0, Teff = 0.0;
-		FString Name, SpectralType;
-		Row.GetColumnValueByIndex(0, X);
-		Row.GetColumnValueByIndex(1, Y);
-		Row.GetColumnValueByIndex(2, Z);
-		Row.GetColumnValueByIndex(3, AbsMag);
-		Row.GetColumnValueByIndex(4, Teff);
-		Row.GetColumnValueByIndex(5, Name);
-		Row.GetColumnValueByIndex(6, SpectralType);
+	Positions.Reserve(Stars.Num());
+	AbsoluteMagnitudes.Reserve(Stars.Num());
+	Names.Reserve(Stars.Num());
+	SpectralTypes.Reserve(Stars.Num());
+	Vertices.Reserve(Stars.Num() * 4);
+	Triangles.Reserve(Stars.Num() * 6);
+	Corners.Reserve(Stars.Num() * 4);
+	Magnitudes.Reserve(Stars.Num() * 4);
+	Colours.Reserve(Stars.Num() * 4);
 
+	for (const StcStar& Star : Stars)
+	{
 		// The catalogue frame is right-handed (ICRS); Unreal's is left-handed, so y flips.
-		const FVector Position(X * UnitsPerParsec, -Y * UnitsPerParsec, Z * UnitsPerParsec);
-		const FLinearColor Colour = BlackbodyColour(Teff);
+		const FVector Position(Star.x * UnitsPerParsec, -Star.y * UnitsPerParsec, Star.z * UnitsPerParsec);
+		const FLinearColor Colour = BlackbodyColour(Star.teff);
 		Positions.Add(Position);
-		AbsoluteMagnitudes.Add(AbsMag);
-		Names.Add(MoveTemp(Name));
-		SpectralTypes.Add(MoveTemp(SpectralType));
+		AbsoluteMagnitudes.Add(Star.absmag);
+		Names.Add(FString(UTF8_TO_TCHAR(Star.name)));
+		SpectralTypes.Add(FString(UTF8_TO_TCHAR(Star.spectral_type)));
 		const int32 First = Vertices.Num();
 		for (const FVector2D& Corner : CornerOffsets)
 		{
 			Vertices.Add(Position);
 			Corners.Add(Corner);
-			Magnitudes.Add(FVector2D(AbsMag, 0.0));
+			Magnitudes.Add(FVector2D(Star.absmag, 0.0));
 			Colours.Add(Colour);
 		}
 		Triangles.Append({First, First + 1, First + 2, First, First + 2, First + 3});
-		return ESQLitePreparedStatementExecuteRowResult::Continue;
-	});
-	if (Rows == INDEX_NONE)
-	{
-		UE_LOG(LogStarField, Error, TEXT("Reading stars failed: %s"), *Database.GetLastError());
-		return false;
 	}
 
-	StarCount = Vertices.Num() / 4;
+	StarCount = Stars.Num();
 	const TArray<FVector> NoNormals;
 	const TArray<FVector2D> NoUVs;
 	const TArray<FProcMeshTangent> NoTangents;
