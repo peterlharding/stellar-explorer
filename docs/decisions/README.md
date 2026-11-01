@@ -39,7 +39,7 @@ What this makes easy, what it makes hard, and what would cause it to be revisite
 | [0004](0004-extensible-queryable-catalogue.md) | An extensible, queryable catalogue that includes exoplanets | Accepted |
 | [0005](0005-relativistic-starships-and-scenarios.md) | Relativistic starships and scenarios | Accepted |
 | [0006](0006-optional-game-layer.md) | A game layer, optional and on top | Accepted |
-| [0007](0007-stack-core-sqlite-godot.md) | Engine-independent core, SQLite catalogue, Godot 4 front end | Accepted; its Godot front end to be superseded by 0012 (Unreal), pending the Vive test: see [PLAN.md](../PLAN.md) |
+| [0007](0007-stack-core-sqlite-godot.md) | Engine-independent core, SQLite catalogue, Godot 4 front end | Accepted; its Godot front end to be superseded by 0012 (Unreal). The Vive test has now passed (2 November 2026); 0012 is written when `feature-star-panel` merges: see [PLAN.md](../PLAN.md) |
 | [0008](0008-core-in-cpp.md) | The core library is written in C++ | Accepted |
 | [0009](0009-personal-tool.md) | A personal tool, not a public installation | Accepted |
 | [0010](0010-public-repository-private-scenarios.md) | A public repository, with book-based scenarios kept outside it | Accepted |

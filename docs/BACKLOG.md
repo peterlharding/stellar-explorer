@@ -46,6 +46,14 @@ Each entry says where the idea came from and which phase it most likely belongs 
   From the Unreal spike, 30 October 2026.
   Phase 3.
 
+- **A visible controller in the headset.** Most Vive apps show the controller held, or at least a wand, in the field of view; the spike shows only the ray, so the held hand is easy to lose track of. A simple shape — a wand or pointer rod at the controller's pose, not a lifelike model — would be enough, with the ray running from its tip.
+  From PLH, 2 November 2026, from the Vive spike ([VIVE.md](../spikes/unreal-stars/VIVE.md)).
+  Phase 3.
+
+- **The controller's other inputs.** The Vive controller has a menu button, a circular trackpad with a click, and two grip buttons besides the trigger; the spike reads only the trigger. Map the rest to the named actions (the action registry the voice spike defines), so a controller reaches the same commands as the panel, the gestures and voice. Some are already spoken for elsewhere — the menu button for the settings screen (F1), the trackpad for the radius of visibility (F2) — leaving the grip buttons and the trackpad click for Keep, let-go, grids, "Return to the Sun" and the like.
+  From PLH, 2 November 2026, from the Vive spike ([VIVE.md](../spikes/unreal-stars/VIVE.md)).
+  Phase 3.
+
 ## Voice
 
 - **Talking to the application.** Spoken commands ("Show the Pleiades", "Go to Delta Pavonis") calling the same named actions as the panel and the gestures; spoken forms of star names added to the catalogue; a wake word or a gesture to listen; what was heard shown before acting.

@@ -47,10 +47,10 @@ The ones that matter for the real app: package with `-pak`; start the engine fro
 - **Toolchain.** With the OpenXR visionOS plugin enabled, the spike compiles and links for visionOS with Xcode 27.1 and the visionOS 27.0 SDK, although Unreal 5.8 states only "Xcode 15.3 or later". The build then stops at signing, which needs the developer's team in `Config/UserEngine.ini` (`[/Script/MacTargetPlatform.XcodeProjectSettings]`, `CodeSigningTeam=`).
 - **Working:** the whole sky in full immersion at about 95 frames a second, and a hand pointer whose panel describes the star it points at; see [VISIONOS.md](VISIONOS.md), sections 12 to 16.
 
-### Part 3: HTC Vive Pro 2 on Windows (not started)
+### Part 3: HTC Vive Pro 2 on Windows (runs, controllers pointing)
 
 On PLH's Windows 11 PC, driven from WSL.
-Needs Unreal 5.8.4 for Windows, Visual Studio with the C++ game workload, SteamVR as the active OpenXR runtime, and Python with `uv` in WSL.
+Needs Unreal 5.8.4 for Windows, Visual Studio with the C++ game workload, HTC's VIVE OpenXR runtime, and Python with `uv` in WSL.
 
 ```sh
 cd /mnt/d/src/Projects/stellar-explorer   # on a Windows drive, not in WSL's own filesystem
@@ -62,7 +62,10 @@ cd spikes/unreal-stars
 ```
 
 `spike.sh` calls Unreal's Windows programs when it finds itself under WSL; `UE_ROOT` overrides the engine's place if it is not under `C:\Program Files\Epic Games\UE_5.8`.
-To record: frame rate in the headset, which controllers are in use (wands with trackpads, or Index controllers with thumbsticks), and anything that differs from the Vision Pro.
+
+Reaching the headset took six fixes (see [VIVE.md](VIVE.md), with their evidence). The ones that matter for the real app: build the catalogue through a mirror when CDS is unreachable from WSL; gate the OpenXR visionOS plugin to Apple platforms so the Windows editor starts; disable OpenXR 1.1, because the VIVE runtime is 1.0-only; check the motion controllers before hand tracking, because the runtime reports a hand tracker even with controllers in use; and bind the device-specific trigger axes (Vive and Valve Index), because OpenXR delivers a trigger value only to a bound action.
+
+**Working:** the whole catalogue renders in the headset, a controller points and its trigger selects a star, and the panel adapts its wording to the trigger; see [VIVE.md](VIVE.md).
 
 ### Part 4: Voice commands (not started, after the Vive)
 
@@ -85,5 +88,5 @@ The point of it (PLH): speech makes the app more accessible — to anyone for wh
 
 - Stars look right but are understated: the brightest stars need a bloom or glare that reads as brilliance.
   The headset exposure is tuned (0.25 on the Vision Pro); the Vive's is not yet.
-- Untested on the Vive: `Config/Windows` starts the app in VR, the view starts 1.5 m from the Sun at 1 pc to 1 m (so α Centauri is 1.3 m away), and the pointer knows only hand tracking, so it needs a controller path there.
-  All of this works on the Vision Pro.
+- On the Vive the app starts in VR, the view starts 1.5 m from the Sun (1 pc to 1 m, so α Centauri is 1.3 m away), and the controller pointer works ([VIVE.md](VIVE.md)).
+  Still to tune there: the star exposure, and a clean in-headset frame-rate figure, since the first run was busy compiling shaders.
