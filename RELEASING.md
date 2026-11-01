@@ -186,8 +186,8 @@ Work flows one way, `branch → devel → main`. `main` is never merged back int
 
 13. **Build and attach the artefacts** (*planned*). There are none yet. When there are, build them from the tag, never from a working tree:
 
-    - Desktop builds for Windows, Linux and macOS, exported from Godot. The Vive runs the Windows or Linux desktop build with OpenXR enabled; it is not a separate artefact.
-    - The Vision Pro build, exported from Godot and built in Xcode on a Mac.
+    - Desktop builds for Windows (x64) and macOS (Apple silicon), packaged from the app project. The Vive runs the Windows desktop build with OpenXR enabled; it is not a separate artefact ([ADR 0013](docs/decisions/0013-target-platforms.md)).
+    - The visionOS build for Vision Pro, packaged on a Mac.
     - `catalogue.sqlite`, with a note of its sources and licence, if the database is distributed apart from the app.
 
 ## Commit conventions

@@ -44,7 +44,7 @@ Each settled decision is an ADR in [decisions/](decisions/README.md).
 
 | ADR | Decision | Date |
 | --- | --- | --- |
-| [0001](decisions/0001-native-app-three-targets.md) | A native application for desktop, HTC Vive and Apple Vision Pro | 3 October 2026 |
+| [0001](decisions/0001-native-app-three-targets.md) | A native application for desktop, HTC Vive and Apple Vision Pro (desktop scope narrowed by 0013) | 3 October 2026 |
 | [0002](decisions/0002-bright-star-scale-designed-to-grow.md) | Start at bright-star scale (HYG, about 120,000 stars), designed to grow | 3 October 2026 |
 | [0003](decisions/0003-scientific-exhibit-with-provenance.md) | A scientific exhibit, with provenance on every value | 3 October 2026 |
 | [0004](decisions/0004-extensible-queryable-catalogue.md) | An extensible, queryable catalogue that includes exoplanets | 3 October 2026 |
@@ -56,6 +56,7 @@ Each settled decision is an ADR in [decisions/](decisions/README.md).
 | [0010](decisions/0010-public-repository-private-scenarios.md) | A public repository, with book-based scenarios kept outside it | 25 October 2026 |
 | [0011](decisions/0011-astrometry-from-hipparcos.md) | Star astrometry from the Hipparcos New Reduction, not HYG | 25 October 2026 |
 | [0012](decisions/0012-unreal-front-end.md) | Unreal Engine 5.8 as the front end, replacing Godot | 2 November 2026 |
+| [0013](decisions/0013-target-platforms.md) | Target platforms: Windows x64, macOS arm64 and visionOS (no Linux, no Intel) | 2 November 2026 |
 
 ## Open questions
 
