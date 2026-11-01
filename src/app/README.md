@@ -22,7 +22,9 @@ cd src/app
 
 ## Data and the core
 
-The app reads `data/catalogue.sqlite` (built by the pipeline in `src/pipeline`). It currently queries the `star` view through Unreal's own SQLite plugin; [ADR 0014](../../docs/decisions/0014-core-as-linked-library.md) moves catalogue access and the astrometry to the engine-independent core in [`src/core`](../core/README.md), which the app will link as a static library behind a C ABI. That wiring (a ThirdParty module + a C++ wrapper, swapping `StarField` onto the core) is the next step; the core itself is built and tested.
+The app reads `data/catalogue.sqlite` (built by the pipeline in `src/pipeline`) through the engine-independent core in [`src/core`](../core/README.md), which it links as a static library behind a C ABI ([ADR 0014](../../docs/decisions/0014-core-as-linked-library.md)): `StarField` loads stars via the core (the `StellarCore` module and the `FStarCatalogue` wrapper), not the engine's SQLite plugin.
+
+**Build the core's static library for the target platform before building the app** — Win64, macOS or visionOS — following [src/core/README.md](../core/README.md). The `StellarCore` module links it and fails with a clear message if it is missing.
 
 ## Naming
 
