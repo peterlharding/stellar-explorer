@@ -8,6 +8,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Features/IModularFeatures.h"
+#include "Framework/Application/SlateApplication.h"
 #include "GameFramework/PlayerController.h"
 #include "IHandTracker.h"
 #include "IXRTrackingSystem.h"
@@ -75,6 +76,8 @@ namespace
 	constexpr float HintSize = 1.4f;
 	constexpr double PanelFollowSeconds = 0.12;
 	constexpr double LightYearsPerParsec = 3.26156;
+	/** A kept star further than this from straight ahead, across or up, gets directions on the panel. */
+	constexpr double InViewDegrees = 25.0;
 
 	// The colours as they are meant to look. The tonemapper washes bright colours out to
 	// white, so they are drawn at OverlayBrightness; and text colours are used as they are,
@@ -212,11 +215,17 @@ AStarPointer::AStarPointer()
 	Hint->SetRelativeLocation(OnPanel(-PanelWidth / 2.0 + PanelPadding, -PanelHeight / 2.0 + PanelPadding + HintSize));
 	Hint->SetWorldSize(HintSize);
 	Hint->SetTextRenderColor((HintColour * OverlayBrightness).ToFColor(false));
-	for (UTextRenderComponent* Text : {Title.Get(), Details.Get(), Hint.Get()})
+	// Above the frame, level with its left edge, its baseline a padding's height above it.
+	VoiceLine = CreateDefaultSubobject<UTextRenderComponent>(TEXT("VoiceLine"));
+	VoiceLine->SetupAttachment(Panel);
+	VoiceLine->SetRelativeLocation(OnPanel(-PanelWidth / 2.0, PanelHeight / 2.0 + PanelPadding / 2.0));
+	VoiceLine->SetWorldSize(DetailsSize);
+	for (UTextRenderComponent* Text : {Title.Get(), Details.Get(), Hint.Get(), VoiceLine.Get()})
 	{
 		Text->SetHorizontalAlignment(EHTA_Left);
 		Text->SetVerticalAlignment(EVRTA_TextTop);
 	}
+	VoiceLine->SetVerticalAlignment(EVRTA_TextBottom);
 }
 
 void AStarPointer::BeginPlay()
@@ -235,6 +244,7 @@ void AStarPointer::BeginPlay()
 		Title->SetTextMaterial(Text);
 		Details->SetTextMaterial(Text);
 		Hint->SetTextMaterial(Text);
+		VoiceLine->SetTextMaterial(Text);
 	}
 	UStaticMesh* Sphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	Dots->SetStaticMesh(Sphere);
@@ -306,8 +316,15 @@ TArray<AStarPointer::FRay, TInlineAllocator<2>> AStarPointer::GetRays(const FVec
 	if (!bHeadset)
 	{
 		const APlayerController* Player = GetWorld()->GetFirstPlayerController();
-		// A click is a pinch that closes at once: open until the frame it happens.
-		const bool bClicked = Player && Player->IsInputKeyDown(EKeys::LeftMouseButton);
+		// A click is a pinch that closes at once: open until the frame it happens. The button as
+		// Slate sees it, over the view: with the mouse left free, the game's own input saw only
+		// the first press after launch (see StarViewerPawn).
+		float X = 0.0f;
+		float Y = 0.0f;
+		const bool bClicked = Player && Player->GetMousePosition(X, Y) && FSlateApplication::IsInitialized() &&
+			FSlateApplication::Get().GetPressedMouseButtons().Contains(EKeys::LeftMouseButton);
+		// Held, the button stays pressed: Tick clears bWasPinched for any hand not pinched now.
+		Hands[MouseHand].bPinched = bClicked;
 		Rays.Add({Head, HeadRotation.Vector(), bClicked, MouseHand, bClicked ? 0.0 : PinchEnd});
 		return Rays;
 	}
@@ -625,6 +642,29 @@ void AStarPointer::Select(int32 Star)
 		*(StarField->GetPosition(Star) / AStarField::UnitsPerParsec).ToString());
 }
 
+void AStarPointer::Keep(int32 Star)
+{
+	// Spoken, a command needs no pinch to turn the ray on first; when the star is let go the
+	// ray is there to point with.
+	bPointingStarted = true;
+	Select(Star);
+}
+
+bool AStarPointer::IsOtherHandPinched() const
+{
+	if (!bHeadset || Pointer == MouseHand)
+	{
+		return false;
+	}
+	return Hands[1 - Pointer].bPinched && !Hands[Pointer].bPinched;
+}
+
+void AStarPointer::SetVoiceLine(const FString& Text, bool bActive)
+{
+	VoiceLine->SetText(FText::FromString(Text));
+	VoiceLine->SetTextRenderColor(((bActive ? SelectionColour : DetailsColour) * OverlayBrightness).ToFColor(false));
+}
+
 void AStarPointer::PlaceRing(UProceduralMeshComponent* Ring, int32 Star, const FVector& Head) const
 {
 	Ring->SetVisibility(Star != INDEX_NONE);
@@ -659,6 +699,16 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 	if (Selected != INDEX_NONE)
 	{
 		ShowStar(Selected, SelectionColour);
+		// A star kept by name may be anywhere: say which way to turn until it is in view.
+		const FVector Local = HeadRotation.UnrotateVector(StarField->GetPosition(Selected) - Head).GetSafeNormal();
+		const double Right = FMath::RadiansToDegrees(FMath::Atan2(Local.Y, Local.X));
+		const double Up = FMath::RadiansToDegrees(FMath::Asin(FMath::Clamp(Local.Z, -1.0, 1.0)));
+		if (FMath::Abs(Right) > InViewDegrees || FMath::Abs(Up) > InViewDegrees)
+		{
+			Hint->SetText(FText::FromString(FString::Printf(TEXT("Turn %s %.0f\u00B0, %s %.0f\u00B0"), Right > 0.0 ? TEXT("right") : TEXT("left"),
+				FMath::Abs(Right), Up > 0.0 ? TEXT("up") : TEXT("down"), FMath::Abs(Up))));
+			return;
+		}
 		Hint->SetText(FText::FromString(!bHeadset ? TEXT("Double-click to let it go")
 				: bUsingControllers               ? TEXT("Pull the trigger twice to let it go")
 												  : TEXT("Pinch twice to let it go")));

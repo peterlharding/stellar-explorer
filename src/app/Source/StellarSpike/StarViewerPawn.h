@@ -23,6 +23,14 @@ public:
 	void UseHeadset();
 
 	/**
+	 * On the desktop: hold the right mouse button and drag to look around; hold Shift to
+	 * move ten times faster. The engine's own mouse look needs the mouse captured, which
+	 * hides the cursor and fights the window manager, so the view follows the cursor here.
+	 */
+	virtual void Tick(float DeltaSeconds) override;
+	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+
+	/**
 	 * A motion controller, 0 the left hand and 1 the right, tracked in a headset that has
 	 * controllers rather than hand tracking (the Vive). Its aim pose is where it points.
 	 * Always valid to call; the component reports IsTracked() when a controller is present.
@@ -32,6 +40,12 @@ public:
 private:
 	UPROPERTY()
 	TObjectPtr<UCameraComponent> Camera;
+
+	bool bHeadset = false;
+	/** Where the cursor was last frame while the right button was held, or unset. */
+	TOptional<FVector2D> DragFrom;
+	/** The movement's top speed as the game mode set it, before Shift multiplies it. */
+	float BaseSpeed = 0.0f;
 
 	UPROPERTY()
 	TObjectPtr<UMotionControllerComponent> LeftController;

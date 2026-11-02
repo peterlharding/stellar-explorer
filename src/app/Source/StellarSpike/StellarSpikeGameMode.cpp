@@ -18,6 +18,7 @@
 #include "ProceduralMeshComponent.h"
 #include "StarField.h"
 #include "StarPointer.h"
+#include "StarVoice.h"
 #include "StarViewerPawn.h"
 #include "UnrealClient.h"
 
@@ -64,7 +65,9 @@ void AStellarSpikeGameMode::StartPlay()
 {
 	UE_LOG(LogStellarSpike, Display, TEXT("Build %s on %s, built %s"), STELLAR_SPIKE_COMMIT, STELLAR_SPIKE_BRANCH, STELLAR_SPIKE_BUILT);
 	StarField = GetWorld()->SpawnActor<AStarField>();
-	GetWorld()->SpawnActor<AStarPointer>()->SetStarField(StarField);
+	AStarPointer* Pointer = GetWorld()->SpawnActor<AStarPointer>();
+	Pointer->SetStarField(StarField);
+	GetWorld()->SpawnActor<AStarVoice>()->Setup(StarField, Pointer);
 	if (FParse::Param(FCommandLine::Get(), TEXT("TestObject")))
 	{
 		SpawnTestObject();
@@ -194,6 +197,9 @@ APawn* AStellarSpikeGameMode::SpawnDefaultPawnFor_Implementation(AController* Ne
 	if (APlayerController* Player = Cast<APlayerController>(NewPlayer))
 	{
 		Player->SetControlRotation(Facing);
+		// On the desktop the cursor stays visible; holding the right button looks around
+		// (Config/DefaultInput.ini).
+		Player->bShowMouseCursor = !bHeadset;
 	}
 	return Pawn;
 }

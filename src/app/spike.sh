@@ -2,7 +2,7 @@
 # Build and run the Unreal spike on a Mac, or on Windows from WSL.
 #   ./spike.sh build      compile the editor target
 #   ./spike.sh material   generate the star material from Shaders/
-#   ./spike.sh run        fly the catalogue in a window (WASD and mouse)
+#   ./spike.sh run        fly the catalogue in a window (WASD, right-drag to look)
 #   ./spike.sh measure    circle the Sun for 30 s, log frame times, take a screenshot
 #   ./spike.sh look RA,DEC  screenshot the sky from the Sun, e.g. 5.6,0 for Orion
 #   ./spike.sh vive       run in the headset through SteamVR (Windows)
@@ -125,8 +125,9 @@ visionos)
 	;;
 install)
 	mac_only install
-	APP="$(find "$HERE/Saved/Archive" -name '*.app' -maxdepth 3 | head -1)"
-	xcrun devicectl device install app --device "$2" "$APP"
+	# The visionOS package only: Saved/Archive also holds the Mac one after ./spike.sh package,
+	# and installing that on the headset fails with CoreDeviceError 3002.
+	xcrun devicectl device install app --device "$2" "$HERE/Saved/Archive/VisionOS/StellarSpike.app"
 	;;
 *)
 	sed -n '2,12p' "$0"
