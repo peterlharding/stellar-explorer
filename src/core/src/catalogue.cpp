@@ -7,13 +7,31 @@ namespace stellar::core
 	namespace
 	{
 		// Stars usable by the renderer: a position and an absolute magnitude (the Sun is
-		// at the origin). Matches the query the spike's StarField runs against the `star`
-		// view; teff defaults to 5800 K and spectral_type to empty when absent.
+		// at the origin), in id order; teff defaults to 5800 K and spectral_type to empty
+		// when absent. These read the tables directly rather than the pipeline's `star`
+		// view: the view pivots every measurement of every star through a GROUP BY, which
+		// took about 2.4 s for the 113,000 stars on a Mac (twice as long on a Vision Pro),
+		// against about 0.6 s here. The pipeline guarantees exactly one preferred value per
+		// quantity of each object (DATA-MODEL.md, "Preferred values"), so a join on the
+		// preferred row gives what the view's max() does. The two queries must agree on
+		// which stars count: an inner join on x and absmag, the rest left joins.
 		constexpr const char* kSelectStars =
-			"SELECT id, x, y, z, absmag, coalesce(teff, 5800), name, coalesce(spectral_type, '') "
-			"FROM star WHERE x IS NOT NULL AND absmag IS NOT NULL";
+			"SELECT o.id, x.value, y.value, z.value, a.value, coalesce(t.value, 5800), o.name, coalesce(p.value, '') "
+			"FROM object AS o "
+			"JOIN measurement AS x ON x.object_id = o.id AND x.quantity = 'x' AND x.preferred "
+			"JOIN measurement AS a ON a.object_id = o.id AND a.quantity = 'absmag' AND a.preferred "
+			"LEFT JOIN measurement AS y ON y.object_id = o.id AND y.quantity = 'y' AND y.preferred "
+			"LEFT JOIN measurement AS z ON z.object_id = o.id AND z.quantity = 'z' AND z.preferred "
+			"LEFT JOIN measurement AS t ON t.object_id = o.id AND t.quantity = 'teff' AND t.preferred "
+			"LEFT JOIN property AS p ON p.object_id = o.id AND p.name = 'spectral_type' AND p.preferred "
+			"WHERE o.kind = 'star' "
+			"ORDER BY o.id";
 		constexpr const char* kCountStars =
-			"SELECT count(*) FROM star WHERE x IS NOT NULL AND absmag IS NOT NULL";
+			"SELECT count(*) "
+			"FROM object AS o "
+			"JOIN measurement AS x ON x.object_id = o.id AND x.quantity = 'x' AND x.preferred "
+			"JOIN measurement AS a ON a.object_id = o.id AND a.quantity = 'absmag' AND a.preferred "
+			"WHERE o.kind = 'star'";
 
 		// Copy a SQLite text column into a fixed field: truncated to fit, always
 		// NUL-terminated, empty when the column is NULL.
@@ -47,7 +65,7 @@ namespace stellar::core
 			sqlite3_close(db); // safe on the handle open_v2 returns even on failure
 			return nullptr;
 		}
-		// The `star` view's GROUP BY needs a temporary table; keep it in memory, since a
+		// Keep any temporary table a query needs (a sort, a GROUP BY) in memory, since a
 		// packaged app (notably on visionOS) has nowhere to write one by default.
 		sqlite3_exec(db, "PRAGMA temp_store = MEMORY", nullptr, nullptr, nullptr);
 		return new Catalogue(db);
