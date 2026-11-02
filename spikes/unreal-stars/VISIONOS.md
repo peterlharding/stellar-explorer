@@ -275,6 +275,25 @@ Values that only a person in the headset can judge were made launch options, set
 - **The ray waits to be asked for.** At start the ray was already on; PLH wanted an explicit action to begin.
   In a headset the ray is now off until a first pinch, which is followed by the same one-second gate as keeping a star, so that pinch cannot also keep one.
 
+## 17. After the move to src/app: four traps building on the Mac again (2 November)
+
+The spike graduated to `src/app`, its stars now loaded through the project's own C++ core, a static library built separately with CMake.
+The first Mac build after that, done by PLH from a fresh pull, failed four ways, none of them in the code.
+
+- **No Metal compiler.** `./spike.sh run` closed at once. The editor's log said: "Xcode Metal Compiler error: cannot execute tool 'metal' due to missing Metal Toolchain".
+  Xcode had been updated to 27.2, and recent Xcode versions ship the Metal compiler as a separate download; the shim `xcrun -f metal` still finds is not the compiler.
+  What worked: `xcodebuild -downloadComponent MetalToolchain` (839 MB). Packaging for the headset compiles Metal shaders too, so it would have failed the same way.
+- **No materials.** The generated materials are git-ignored build products, so a fresh checkout draws nothing until `./spike.sh material` has run once; the log says "M_Star is missing".
+- **A symlink breaks the build accelerator.** `./spike.sh visionos` failed with "unable to read PCH file ... SharedPCH.Engine.Project.ValApi.ValExpApi.Cpp20.h.gch: No such file or directory".
+  PLH works from `/u`, a symlink to `/Volumes/u`. Unreal's build accelerator registered the build folder under `/u/...`, the compiler's output resolved to `/Volumes/u/...`, and the accelerator refused to record the precompiled header ("Failed to get file information ... This should not happen!"), so every file that included it failed.
+  My own builds had worked only because I ran them from `/Volumes/u`.
+  What worked: `spike.sh` resolves its own folder with `pwd -P`, so Unreal is always given the real path, whichever way the shell got there.
+- **The signing team stayed behind.** Then signing failed: "Signing for StellarSpike requires a development team".
+  The team is in `Config/UserEngine.ini`, git-ignored because it is personal, and a git-ignored file does not move when a folder is moved in git.
+  Copying it to `src/app/Config` fixed it.
+
+The core library had problems of its own, fixed in its CMake file: it was built for macOS 27.2 while Unreal links the app for 14.0, so every object file drew a linker warning; Xcode put the visionOS library in `Release-xros/`, not the `Release/` the app's build looks in; and the vendored SQLite drew pages of Xcode's warnings.
+
 ## Harmless noise in the logs
 
 - "Ensure condition failed: ViewController" in `FIOSApplication::HandlePhysicalKeyboardConnectionChanged`: a handled ensure when a keyboard is reported at start-up, with no UIKit view controller on visionOS.

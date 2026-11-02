@@ -12,7 +12,10 @@
 # Under WSL the checkout must be on a Windows drive (/mnt/c, /mnt/d), where Unreal's
 # Windows tools can read it; UE_ROOT overrides where the engine is.
 set -eu
-HERE="$(cd "$(dirname "$0")" && pwd)"
+# The real path, symlinks resolved (pwd -P): Unreal's build accelerator records the folders it
+# is given, and if a symlink (such as /u for /Volumes/u) makes them differ from where the
+# compiler writes, it drops the precompiled header and every compile that needs it fails.
+HERE="$(cd "$(dirname "$0")" && pwd -P)"
 
 if grep -qi microsoft /proc/version 2>/dev/null; then
 	# WSL: run Unreal's Windows programs directly, passing them Windows paths.
