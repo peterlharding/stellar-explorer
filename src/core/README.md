@@ -48,7 +48,11 @@ The ThirdParty Unreal module links **both** and adds `include/` to its include p
 
 ## macOS and visionOS static libraries (for Unreal)
 
-Built on the Mac with the **Xcode generator**, into `<build>/Release/` to match the Win64 layout. The app's ThirdParty module (`src/app/Source/StellarCore/StellarCore.Build.cs`) expects, per [ADR 0013](../../docs/decisions/0013-target-platforms.md):
+Built on the Mac with the **Xcode generator**, into `<build>/Release/` to match the Win64 layout. `CMakeLists.txt` sees to three things the Xcode generator would otherwise get wrong for Unreal:
+
+- **Deployment targets** match what Unreal 5.8 links the app for: macOS 14.0 and visionOS 1.0. Without them the libraries target the SDK's own version and the app's link warns that they were "built for newer macOS". Pass `-DCMAKE_OSX_DEPLOYMENT_TARGET` to override.
+- **The output directory** is `<build>/Release/` even for a device SDK, where Xcode would use `Release-xros/`.
+- **SQLite compiles without warnings,** since Xcode adds its own (such as `-Wshorten-64-to-32`) and the amalgamation is upstream's code. The app's ThirdParty module (`src/app/Source/StellarCore/StellarCore.Build.cs`) expects, per [ADR 0013](../../docs/decisions/0013-target-platforms.md):
 
 - macOS (Apple silicon): `src/core/build-mac/Release/{libstellar_core.a, libsqlite3.a}`
 - visionOS (device): `src/core/build-visionos/Release/{libstellar_core.a, libsqlite3.a}`
@@ -70,7 +74,7 @@ cmake -S src/core -B src/core/build-visionos -G Xcode \
 cmake --build src/core/build-visionos --config Release
 ```
 
-Needs CMake ≥ 3.28 (visionOS support) and the visionOS SDK. Tests are off because their executables are device binaries that cannot run on the host. If the Unreal link later complains, match UE's visionOS **deployment target** (add `-DCMAKE_OSX_DEPLOYMENT_TARGET=<version>`). For the **simulator**, use `-DCMAKE_OSX_SYSROOT=xrsimulator` into `build-visionos-sim/` and wire that path in `StellarCore.Build.cs` when the simulator is targeted.
+Needs CMake ≥ 3.28 (visionOS support) and the visionOS SDK. Tests are off because their executables are device binaries that cannot run on the host. For the **simulator**, use `-DCMAKE_OSX_SYSROOT=xrsimulator` into `build-visionos-sim/` and wire that path in `StellarCore.Build.cs` when the simulator is targeted.
 
 This is the least-trodden path — expect some iteration — but the C ABI seam ([ADR 0014](../../docs/decisions/0014-core-as-linked-library.md)) means it is only a matter of producing a valid arm64 archive; nothing in the boundary depends on the toolchain.
 

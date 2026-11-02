@@ -1,4 +1,17 @@
 cmake_minimum_required(VERSION 3.20)
+
+# On Apple platforms, build for the same oldest OS as Unreal 5.8 links the app for, or the
+# linker warns that the core was built for a newer OS than the app: macOS 14.0
+# (Engine/Config/Mac/Mac_SDK.json) and visionOS 1.0 (the minimum in the app's binary).
+# An explicit -DCMAKE_OSX_DEPLOYMENT_TARGET still wins.
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+	if(CMAKE_SYSTEM_NAME STREQUAL "visionOS")
+		set(CMAKE_OSX_DEPLOYMENT_TARGET "1.0" CACHE STRING "Oldest visionOS to run on" FORCE)
+	elseif(NOT CMAKE_SYSTEM_NAME OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+		set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0" CACHE STRING "Oldest macOS to run on" FORCE)
+	endif()
+endif()
+
 project(stellar_core VERSION 0.0.0 LANGUAGES C CXX)
 
 # The engine-independent core (ADR 0008), built as a static library with a C ABI
@@ -16,6 +29,11 @@ add_library(sqlite3 STATIC third_party/sqlite/sqlite3.c)
 target_include_directories(sqlite3 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/third_party/sqlite)
 target_compile_definitions(sqlite3 PRIVATE SQLITE_OMIT_LOAD_EXTENSION=1 SQLITE_THREADSAFE=1)
 target_link_libraries(sqlite3 PUBLIC Threads::Threads)
+# No warnings at all for it: Xcode's generator adds warnings of its own (such as
+# -Wshorten-64-to-32), and the amalgamation is upstream's to change, not ours.
+target_compile_options(sqlite3 PRIVATE
+	$<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-w>
+	$<$<C_COMPILER_ID:MSVC>:/w>)
 
 add_library(stellar_core STATIC
 	src/astrometry.cpp
@@ -28,6 +46,12 @@ target_link_libraries(stellar_core PRIVATE sqlite3)
 target_compile_options(stellar_core PRIVATE
 	$<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall;-Wextra>
 	$<$<CXX_COMPILER_ID:MSVC>:/W4>)
+
+# The libraries the app links land in <build>/<config>/ on every generator and SDK:
+# Xcode would otherwise put a device build in Release-xros/, not the Release/ that
+# src/app/Source/StellarCore/StellarCore.Build.cs looks in.
+set_target_properties(sqlite3 stellar_core PROPERTIES
+	ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
 
 option(STELLAR_CORE_TESTS "Build the core's tests" ON)
 if(STELLAR_CORE_TESTS)
