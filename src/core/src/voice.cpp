@@ -27,6 +27,10 @@ namespace stellar::core
 			Phrase{"let it go", VoiceAction::LetGo},
 			Phrase{"let go", VoiceAction::LetGo},
 			Phrase{"release", VoiceAction::LetGo},
+			Phrase{"align to galactic north", VoiceAction::AlignGalactic},
+			Phrase{"galactic north", VoiceAction::AlignGalactic},
+			Phrase{"align to celestial north", VoiceAction::AlignCelestial},
+			Phrase{"celestial north", VoiceAction::AlignCelestial},
 			Phrase{"back off", VoiceAction::BackOff},
 			Phrase{"back up", VoiceAction::BackOff},
 			Phrase{"move back", VoiceAction::BackOff},
@@ -361,13 +365,14 @@ namespace stellar::core
 		// One edit for every four letters after the first: enough for "pavoness" to be
 		// "pavonis", none for a word of four letters or fewer ("vela" is not "Vega", "bed"
 		// is not "Beid"). Failing that, from five letters, a name that sounds alike: the
-		// same consonants, or one apart once there are four ("battle girls", "ptlkls", for
+		// same consonants, or one apart once there are five ("battle girls", "ptlkls", for
 		// "Betelgeuse", "ptlks"), within two edits in three of the letters.
 		const std::size_t near = (key.size() - 1) / 4;
 		const std::size_t loose = bSoundsAlike && key.size() >= 5 ? key.size() * 2 / 3 : near;
 		const std::string heard_sound = sound(key, true);
 		const std::string heard_strict = sound(key, false);
-		const std::size_t sound_slack = heard_sound.size() >= 4 ? 1 : 0;
+		// One consonant's slack from five up: at four, "pleiades" (p-l-t-s) became Paradys (p-t-s).
+		const std::size_t sound_slack = heard_sound.size() >= 5 ? 1 : 0;
 		const Entry* best = nullptr;
 		std::size_t best_rank = 0;
 		std::size_t best_sound = 0;
@@ -474,7 +479,7 @@ namespace stellar::core
 			}
 		}
 		if (command.action == VoiceAction::LetGo || command.action == VoiceAction::GoThere || command.action == VoiceAction::BackOff ||
-			command.action == VoiceAction::Closer)
+			command.action == VoiceAction::Closer || command.action == VoiceAction::AlignGalactic || command.action == VoiceAction::AlignCelestial)
 		{
 			return command;
 		}

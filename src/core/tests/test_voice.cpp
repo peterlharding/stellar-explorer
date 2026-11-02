@@ -40,6 +40,7 @@ namespace
 			{"Beid", 19539, 4.0, 63.0, true},
 			{"Betelgeuse", 27920, 0.42, 152.0, true},
 			{"Sadr", 100240, 2.23, 560.0, true},
+			{"Paradys", 60000, 8.0, 200.0, true},
 		});
 	}
 
@@ -101,8 +102,13 @@ int main()
 	expect(voice, "closer", VoiceAction::Closer, -1);
 	expect(voice, "Stella move in", VoiceAction::Closer, -1);
 
+	// Which way is up on the screen.
+	expect(voice, "Stellar align to galactic north", VoiceAction::AlignGalactic, -1);
+	expect(voice, "galactic north", VoiceAction::AlignGalactic, -1);
+	expect(voice, "celestial north", VoiceAction::AlignCelestial, -1);
+
 	// Not close enough to anything.
-	expect(voice, "go to the Pleiades", VoiceAction::GoTo, -1);
+	expect(voice, "go to the Pleiades", VoiceAction::GoTo, -1); // not Paradys, which sounds a consonant away
 	expect(voice, "what a lovely evening", VoiceAction::None, -1);
 	expect(voice, "Serious", VoiceAction::None, -1); // a sound-alike needs a command before it
 	expect(voice, "Sirius", VoiceAction::Show, 32264);
@@ -145,7 +151,7 @@ int main()
 			}
 			return i;
 		};
-		check(phrases.size() == 14 && phrases[0] == "Sun" && phrases[1] == "Sirius", "each name once, the Sun and Sirius first");
+		check(phrases.size() == 15 && phrases[0] == "Sun" && phrases[1] == "Sirius", "each name once, the Sun and Sirius first");
 		check(at("Barnard's Star") < at("Zeta Velorum"), "a faint near star before a brighter far one");
 		check(at("Alpha Centauri") == at("Rigil Kentaurus") + 1, "a star's names together");
 	}

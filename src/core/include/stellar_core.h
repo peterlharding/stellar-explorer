@@ -106,7 +106,9 @@ typedef enum StcVoiceAction
 	STC_VOICE_LET_GO = 4,        /* "let go" of the star kept */
 	STC_VOICE_GO_THERE = 5,      /* "go there": to the star kept or pointed at, no name needed */
 	STC_VOICE_BACK_OFF = 6,      /* "back off": further from the star kept or pointed at */
-	STC_VOICE_CLOSER = 7         /* "closer": nearer the star kept or pointed at */
+	STC_VOICE_CLOSER = 7,        /* "closer": nearer the star kept or pointed at */
+	STC_VOICE_ALIGN_GALACTIC = 8, /* "galactic north": the galactic north pole up on the screen */
+	STC_VOICE_ALIGN_CELESTIAL = 9 /* "celestial north": the celestial north pole up, as at start */
 } StcVoiceAction;
 
 /* Capacity (including the NUL) of StcVoiceCommand's target: what was heard. */

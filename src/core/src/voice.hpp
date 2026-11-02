@@ -21,6 +21,8 @@ namespace stellar::core
 		GoThere = 5,
 		BackOff = 6,
 		Closer = 7,
+		AlignGalactic = 8,
+		AlignCelestial = 9,
 	};
 
 	struct VoiceCommand
