@@ -22,11 +22,7 @@ public:
 	/** In a headset the head turns the view; only yaw comes from the controller, so the horizon stays level. */
 	void UseHeadset();
 
-	/**
-	 * On the desktop: hold the right mouse button and drag to look around; hold Shift to
-	 * move ten times faster. The engine's own mouse look needs the mouse captured, which
-	 * hides the cursor and fights the window manager, so the view follows the cursor here.
-	 */
+	/** On the desktop: E and Q move up and down, and Shift moves ten times faster. */
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
@@ -42,8 +38,6 @@ private:
 	TObjectPtr<UCameraComponent> Camera;
 
 	bool bHeadset = false;
-	/** Where the cursor was last frame while the right button was held, or unset. */
-	TOptional<FVector2D> DragFrom;
 	/** The movement's top speed as the game mode set it, before Shift multiplies it. */
 	float BaseSpeed = 0.0f;
 

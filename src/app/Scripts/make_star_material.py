@@ -15,8 +15,16 @@ FOLDER = "/Game/Generated"
 NAME = "M_Star"
 SHADERS = Path(__file__).resolve().parent.parent / "Shaders"
 # LimitingMag is the faintest star meant to be visible, so Exposure puts it just
-# above black; a magnitude 0 star is then 400 times brighter and blooms.
-PARAMETERS = {"UnitsPerParsec": 100.0, "LimitingMag": 6.5, "BaseSize": 0.0012, "Exposure": 0.04}
+# above black; a magnitude 0 star is then 400 times brighter and blooms. Saturation
+# exaggerates the colours, as planetarium programs do: a blackbody's own (a 3,800 K
+# red giant is a pale peach) reads as nearly white on the screen.
+PARAMETERS = {
+    "UnitsPerParsec": 100.0,
+    "LimitingMag": 6.5,
+    "BaseSize": 0.0012,
+    "Exposure": 0.04,
+    "Saturation": 1.6,
+}
 
 library = unreal.MaterialEditingLibrary
 
@@ -155,7 +163,13 @@ def build():
         "StarColour",
         -600,
         0,
-        {"Corner": corner, "Colour": colour, "Exposure": parameters["Exposure"], **common},
+        {
+            "Corner": corner,
+            "Colour": colour,
+            "Exposure": parameters["Exposure"],
+            "Saturation": parameters["Saturation"],
+            **common,
+        },
     )
     library.connect_material_property(offset, "", unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
     library.connect_material_property(emissive, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)

@@ -8,6 +8,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Features/IModularFeatures.h"
+#include "DesktopMouse.h"
 #include "Framework/Application/SlateApplication.h"
 #include "GameFramework/PlayerController.h"
 #include "IHandTracker.h"
@@ -76,6 +77,20 @@ namespace
 	constexpr float HintSize = 1.4f;
 	constexpr double PanelFollowSeconds = 0.12;
 	constexpr double LightYearsPerParsec = 3.26156;
+	/** The ring under the cursor comes back this long after the view last moved. */
+	constexpr double HoverAfterMoveSeconds = 0.5;
+	/** How far the view turns as the mouse drags one pixel. */
+	constexpr double LookDegreesPerPixel = 0.2;
+	/** Turning up or down stops short of straight up or down, where the view would flip. */
+	constexpr double MaxPitchDegrees = 88.0;
+	/** Panning moves this fraction of the distance to the star kept for each pixel dragged. */
+	constexpr double PanPerPixel = 0.002;
+	/** Each notch of the wheel takes the view this fraction of its distance from the star kept. */
+	constexpr double ZoomFactor = 0.85;
+	/** Ctrl + middle-drag: notches of the wheel for each pixel dragged. */
+	constexpr float ZoomNotchesPerPixel = 0.05f;
+	/** Zooming stops this near a star: 0.005 pc, in Unreal units, beyond the near plane. */
+	constexpr double SmallestStep = 1.5;
 	/** A kept star further than this from straight ahead, across or up, gets directions on the panel. */
 	constexpr double InViewDegrees = 25.0;
 
@@ -220,6 +235,8 @@ AStarPointer::AStarPointer()
 	VoiceLine->SetupAttachment(Panel);
 	VoiceLine->SetRelativeLocation(OnPanel(-PanelWidth / 2.0, PanelHeight / 2.0 + PanelPadding / 2.0));
 	VoiceLine->SetWorldSize(DetailsSize);
+	// Empty until there is something to say: a new text component reads "Text".
+	VoiceLine->SetText(FText::GetEmpty());
 	for (UTextRenderComponent* Text : {Title.Get(), Details.Get(), Hint.Get(), VoiceLine.Get()})
 	{
 		Text->SetHorizontalAlignment(EHTA_Left);
@@ -254,8 +271,13 @@ void AStarPointer::BeginPlay()
 		Dots->AddInstance(FTransform::Identity, true);
 	}
 
-	// The desktop's view centre always points; there is nothing to turn on.
+	// The desktop's cursor always points; there is nothing to turn on.
 	bPointingStarted = !bHeadset;
+	if (!bHeadset && FSlateApplication::IsInitialized())
+	{
+		Mouse = MakeShared<FDesktopMouse>();
+		FSlateApplication::Get().RegisterInputPreProcessor(Mouse);
+	}
 	FParse::Value(FCommandLine::Get(), TEXT("PointingHand="), PointingHand);
 	FParse::Value(FCommandLine::Get(), TEXT("GestureGate="), GestureGateSeconds);
 	FParse::Value(FCommandLine::Get(), TEXT("DoublePinch="), DoublePinchSeconds);
@@ -315,17 +337,14 @@ TArray<AStarPointer::FRay, TInlineAllocator<2>> AStarPointer::GetRays(const FVec
 	const double Now = GetWorld()->GetRealTimeSeconds();
 	if (!bHeadset)
 	{
+		// The ray under the cursor, when it is over the view; clicks are DesktopMouse's.
 		const APlayerController* Player = GetWorld()->GetFirstPlayerController();
-		// A click is a pinch that closes at once: open until the frame it happens. The button as
-		// Slate sees it, over the view: with the mouse left free, the game's own input saw only
-		// the first press after launch (see StarViewerPawn).
-		float X = 0.0f;
-		float Y = 0.0f;
-		const bool bClicked = Player && Player->GetMousePosition(X, Y) && FSlateApplication::IsInitialized() &&
-			FSlateApplication::Get().GetPressedMouseButtons().Contains(EKeys::LeftMouseButton);
-		// Held, the button stays pressed: Tick clears bWasPinched for any hand not pinched now.
-		Hands[MouseHand].bPinched = bClicked;
-		Rays.Add({Head, HeadRotation.Vector(), bClicked, MouseHand, bClicked ? 0.0 : PinchEnd});
+		FVector Origin;
+		FVector Direction;
+		if (Player != nullptr && FDesktopMouse::IsCursorOverView() && Player->DeprojectMousePositionToWorld(Origin, Direction))
+		{
+			Rays.Add({Head, Direction, false, MouseHand, PinchEnd});
+		}
 		return Rays;
 	}
 	// Prefer motion controllers when one is tracked (the Vive); otherwise hand tracking (the Vision
@@ -589,8 +608,9 @@ void AStarPointer::Tick(float DeltaSeconds)
 		}
 		State.bWasPinched = Ray.bPinched;
 
-		// A kept star holds the panel, and the ray goes until the star is let go.
-		if (bPointingStarted && Selected == INDEX_NONE)
+		// A kept star holds the panel, and in a headset the ray goes until the star is let go;
+		// on the desktop the cursor still rings the star under it.
+		if (bPointingStarted && (Selected == INDEX_NONE || !bHeadset))
 		{
 			Hovered = Star;
 			for (int32 Dot = 0; Dot < DotCount; ++Dot)
@@ -604,6 +624,10 @@ void AStarPointer::Tick(float DeltaSeconds)
 		}
 	}
 	Dots->SetVisibility(bHeadset && bPointing && bPointingStarted && Selected == INDEX_NONE);
+	if (Mouse.IsValid() || !Queued.IsEmpty())
+	{
+		UseMouse(Head, HeadRotation);
+	}
 	// A hand that is no longer tracked has no pinch to continue.
 	for (FHand& State : Hands)
 	{
@@ -623,7 +647,9 @@ void AStarPointer::Tick(float DeltaSeconds)
 		Select(Hovered);
 	}
 
-	PlaceRing(HoverRing, Hovered != Selected ? Hovered : INDEX_NONE, Head);
+	// While the view is being moved the star under the cursor is beside the point: no ring.
+	const bool bMovingView = Now - LastViewMove < HoverAfterMoveSeconds;
+	PlaceRing(HoverRing, Hovered != Selected && !bMovingView ? Hovered : INDEX_NONE, Head);
 	PlaceRing(SelectionRing, Selected, Head);
 	PlacePanel(Head, HeadRotation, DeltaSeconds);
 }
@@ -640,6 +666,172 @@ void AStarPointer::Select(int32 Star)
 	}
 	UE_LOG(LogStarPointer, Display, TEXT("Selected %s (%s) at %s"), *StarField->GetName(Star), *StarField->GetSpectralType(Star),
 		*(StarField->GetPosition(Star) / AStarField::UnitsPerParsec).ToString());
+}
+
+void AStarPointer::EndPlay(const EEndPlayReason::Type Reason)
+{
+	if (Mouse.IsValid() && FSlateApplication::IsInitialized())
+	{
+		FSlateApplication::Get().UnregisterInputPreProcessor(Mouse);
+	}
+	Mouse.Reset();
+	Super::EndPlay(Reason);
+}
+
+void AStarPointer::UseMouse(const FVector& Head, const FRotator& HeadRotation)
+{
+	APlayerController* Player = GetWorld()->GetFirstPlayerController();
+	APawn* Pawn = Player != nullptr ? Player->GetPawn() : nullptr;
+	if (Pawn == nullptr)
+	{
+		return;
+	}
+	// As in Blender, with the star kept as the pivot. Each step works from where the view
+	// is after the one before, since the camera manager reports last frame's.
+	FVector Camera = Head;
+	FQuat Facing = HeadRotation.Quaternion();
+	const bool bPivot = Selected != INDEX_NONE;
+	const FVector Pivot = bPivot ? StarField->GetPosition(Selected) : Camera;
+
+	// A left or right drag turns the view in place; so does a middle-drag with no star to orbit.
+	// The mouse's gestures, and any asked for by command (MoveView).
+	FVector2D Turn = Queued.Turn;
+	FVector2D Orbit = Queued.Orbit;
+	FVector2D Panned = Queued.Pan;
+	float Zoom = Queued.Zoom;
+	Queued = FViewMove();
+	if (Mouse.IsValid())
+	{
+		Turn += Mouse->TakeLook();
+		Orbit += Mouse->TakeOrbit();
+		Panned += Mouse->TakePan();
+		Zoom += Mouse->TakeWheel() + Mouse->TakeZoomDrag() * ZoomNotchesPerPixel;
+		if (Mouse->IsDragging() || !Turn.IsZero() || !Orbit.IsZero() || !Panned.IsZero() || Zoom != 0.0f)
+		{
+			LastViewMove = GetWorld()->GetRealTimeSeconds();
+		}
+	}
+	// Both turn about the screen's own axes, a horizontal drag about its vertical and a
+	// vertical drag about its horizontal: turning about the sky's pole looked like rolling the
+	// screen whenever the view was not upright to it. The view is then set upright to ViewUp
+	// again, which leaves the line of sight, and so the star at its centre, where it is.
+	const auto ScreenTurn = [&Facing](const FVector2D& By) {
+		const FQuat Across(Facing.GetUpVector(), FMath::DegreesToRadians(By.X * LookDegreesPerPixel));
+		const FQuat Up(Facing.GetRightVector(), FMath::DegreesToRadians(By.Y * LookDegreesPerPixel));
+		return Across * Up;
+	};
+	if (bPivot)
+	{
+		if (!Orbit.IsNearlyZero())
+		{
+			// Round the star: the camera and its facing turn together, so the star stays put.
+			FQuat Rotation = ScreenTurn(Orbit);
+			if (IsNearPole((Rotation * Facing).GetForwardVector()))
+			{
+				Rotation = ScreenTurn(FVector2D(Orbit.X, 0.0)); // never over the top, where the view would flip
+			}
+			Camera = Pivot + Rotation.RotateVector(Camera - Pivot);
+			Facing = Rotation * Facing;
+		}
+	}
+	else
+	{
+		Turn += Orbit;
+	}
+	if (!Turn.IsNearlyZero())
+	{
+		// In place, the sky moving with the hand: the opposite way to orbiting.
+		FQuat Rotation = ScreenTurn(-Turn);
+		if (IsNearPole((Rotation * Facing).GetForwardVector()))
+		{
+			Rotation = ScreenTurn(FVector2D(-Turn.X, 0.0));
+		}
+		Facing = Rotation * Facing;
+	}
+
+	// Shift + middle-drag slides the view across, the sky following the hand, faster the
+	// further the star kept.
+	const double Reach = bPivot ? FMath::Max(FVector::Distance(Camera, Pivot), SmallestStep) : AStarField::UnitsPerParsec;
+	if (!Panned.IsNearlyZero())
+	{
+		Camera += (-Facing.GetRightVector() * Panned.X + Facing.GetUpVector() * Panned.Y) * Reach * PanPerPixel;
+	}
+
+	// The wheel, or Ctrl + middle-drag, zooms: towards the star kept, along the line to it so
+	// it stays where it is on screen, each notch a fraction of the way; else straight ahead.
+	if (Zoom != 0.0f)
+	{
+		if (bPivot)
+		{
+			// Away from the star along the line from it, or, on top of it (no line), straight back.
+			const double Distance = FVector::Distance(Camera, Pivot);
+			const double Wanted = FMath::Max(Distance * FMath::Pow(ZoomFactor, static_cast<double>(Zoom)), SmallestStep);
+			const FVector Away = Distance > UE_KINDA_SMALL_NUMBER ? (Camera - Pivot) / Distance : -Facing.GetForwardVector();
+			Camera = Pivot + Away * Wanted;
+		}
+		else
+		{
+			Camera += Facing.GetForwardVector() * 0.5 * AStarField::UnitsPerParsec * Zoom;
+		}
+	}
+
+	// "." or F turns the view to the star kept, as Blender's View Selected frames it.
+	if (bPivot && (Player->WasInputKeyJustPressed(EKeys::Period) || Player->WasInputKeyJustPressed(EKeys::F) ||
+					  Player->WasInputKeyJustPressed(EKeys::Decimal)))
+	{
+		Facing = (Pivot - Camera).Rotation().Quaternion();
+	}
+
+	if (!Camera.Equals(Head))
+	{
+		Pawn->AddActorWorldOffset(Camera - Head);
+	}
+	if (!Facing.Equals(HeadRotation.Quaternion()))
+	{
+		Player->SetControlRotation(ViewRotation(Facing.GetForwardVector()));
+	}
+
+	// A click keeps the star under the cursor, in place of any kept; a click on empty sky,
+	// or a double-click, lets go.
+	if (!Mouse.IsValid())
+	{
+		return;
+	}
+	for (const FDesktopMouse::FClick& Click : Mouse->TakeClicks())
+	{
+		Select(Click.bDouble ? INDEX_NONE : Hovered);
+	}
+}
+
+void AStarPointer::SetViewUp(const FVector& Up)
+{
+	ViewUp = Up.GetSafeNormal();
+	APlayerController* Player = GetWorld()->GetFirstPlayerController();
+	if (Player == nullptr || Player->PlayerCameraManager == nullptr)
+	{
+		return;
+	}
+	// With another pole up the view rolls, which the camera manager limits to under a right
+	// angle by default. Not -180 to 180: its clamp takes a full turn as no range at all, and
+	// held the roll at 180, the view upside down.
+	Player->PlayerCameraManager->ViewRollMin = -179.9f;
+	Player->PlayerCameraManager->ViewRollMax = 179.9f;
+	Player->SetControlRotation(ViewRotation(Player->PlayerCameraManager->GetCameraRotation().Vector()));
+}
+
+FRotator AStarPointer::ViewRotation(const FVector& Forward) const
+{
+	// Looking at the pole itself there is no up to keep: keep the way it is.
+	if (FMath::Abs(FVector::DotProduct(Forward.GetSafeNormal(), ViewUp)) > 0.9999)
+	{
+		return Forward.Rotation();
+	}
+	return FRotationMatrix::MakeFromXZ(Forward, ViewUp).Rotator();
+}
+
+bool AStarPointer::IsNearPole(const FVector& Forward) const
+{
+	return FMath::Abs(FVector::DotProduct(Forward.GetSafeNormal(), ViewUp)) > FMath::Cos(FMath::DegreesToRadians(90.0 - MaxPitchDegrees));
 }
 
 void AStarPointer::Keep(int32 Star)
@@ -709,13 +901,13 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 				FMath::Abs(Right), Up > 0.0 ? TEXT("up") : TEXT("down"), FMath::Abs(Up))));
 			return;
 		}
-		Hint->SetText(FText::FromString(!bHeadset ? TEXT("Double-click to let it go")
+		Hint->SetText(FText::FromString(!bHeadset ? TEXT("Middle-drag orbits it; click the sky to let go")
 				: bUsingControllers               ? TEXT("Pull the trigger twice to let it go")
 												  : TEXT("Pinch twice to let it go")));
 		return;
 	}
 	Hint->SetText(FText::FromString(!bPointingStarted ? (bUsingControllers ? TEXT("Then pull the trigger again to keep a star") : TEXT("Then pinch again to keep a star"))
-			: !bHeadset                             ? TEXT("Click to keep a star")
+			: !bHeadset                             ? TEXT("Click to keep a star; middle-drag to look round")
 			: bUsingControllers                     ? TEXT("Pull the trigger to keep a star, both to exit")
 													: TEXT("Pinch to keep a star, both hands to exit")));
 	if (Hovered != INDEX_NONE)
@@ -725,7 +917,7 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 	}
 	Title->SetText(FText::FromString(!bPointingStarted ? (bUsingControllers ? TEXT("Pull the trigger to start pointing") : TEXT("Pinch to start pointing"))
 			: bHeadset                              ? TEXT("Point at a star")
-													: TEXT("Look at a star")));
+													: TEXT("Move over a star")));
 	Title->SetTextRenderColor((HintColour * OverlayBrightness).ToFColor(false));
 	// With nothing to describe, the build, so a session can be matched to its code.
 	Details->SetText(FText::FromString(FString::Printf(TEXT("Build %s\n%s, %s"), STELLAR_SPIKE_COMMIT, STELLAR_SPIKE_BRANCH, STELLAR_SPIKE_BUILT)));
