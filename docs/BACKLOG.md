@@ -54,12 +54,20 @@ Each entry says where the idea came from and which phase it most likely belongs 
   From PLH, 2 November 2026, from the Vive spike ([VIVE.md](../spikes/unreal-stars/VIVE.md)).
   Phase 3.
 
+## Tools
+
+- **A desktop console for the headset.** On the Mac and Windows: a view of the space to pan, zoom and orbit (Google Earth, Blender) showing where the wearer is and looks, controls (find a star by typing its name, go there, the settings), and the headset's log live.
+  It connects to a small control service in the headset app over the local network, and sends the same named actions as the panel, gestures and voice; built as the same Unreal app in a second role.
+  From PLH, 2 November 2026; see [notes/2026-10-30-DIRECTION.md](notes/2026-10-30-DIRECTION.md#f10-a-desktop-console-for-the-headset).
+  Brought forward to follow the voice spike, to ease development: first the control service, the log, the headset's state and a few actions.
+
 ## Voice
 
 - **Talking to the application.** Spoken commands ("Show the Pleiades", "Go to Delta Pavonis") calling the same named actions as the panel and the gestures; spoken forms of star names added to the catalogue; a wake word or a gesture to listen; what was heard shown before acting.
   Later, spoken questions turned into catalogue queries.
   From PLH, 30 October 2026; see [notes/2026-10-30-DIRECTION.md](notes/2026-10-30-DIRECTION.md#f9-talking-to-the-application).
   A spike first, after the Vive spike, to settle recognition, offline or online, and how listening starts; the feature itself in phase 4, after the named actions exist.
+  The spike, under way since 2 November 2026: Apple's recogniser works on the Mac and the Vision Pro, offline, by wake word in the headset; star names are the weak spot, and "go there" to the star pointed at works every time ([VOICE.md](../spikes/unreal-stars/VOICE.md)).
 
 ## Travel
 

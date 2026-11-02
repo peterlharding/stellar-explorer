@@ -24,7 +24,7 @@ flowchart LR
 | 7 Scale-up | AT-HYG at 2.5 million stars, then a Gaia octree | 2.5 million stars hold headset frame rate; the octree design is proven on a Gaia sample |
 
 **Progress.** Phase 1's gate passes as of 25 October 2026: `make catalogue` builds the catalogue and `make gate` checks it (see [DATA-MODEL.md](DATA-MODEL.md#the-gate)).
-The [Unreal spike](../spikes/unreal-stars/README.md) renders the whole catalogue at 120 fps on the Mac and about 95 fps in full immersion on the Vision Pro (30 October 2026), which retires phase 3's old go/no-go on the Vision Pro. Its Vive test has now passed (2 November 2026): the spike builds and runs on the Vive Pro 2, and a controller points and its trigger selects a star ([VIVE.md](../spikes/unreal-stars/VIVE.md)). A spike on voice commands is next.
+The [Unreal spike](../spikes/unreal-stars/README.md) renders the whole catalogue at 120 fps on the Mac and about 95 fps in full immersion on the Vision Pro (30 October 2026), which retires phase 3's old go/no-go on the Vision Pro. Its Vive test has now passed (2 November 2026): the spike builds and runs on the Vive Pro 2, and a controller points and its trigger selects a star ([VIVE.md](../spikes/unreal-stars/VIVE.md)). A spike on voice commands is under way, and a desktop console for the headset (its log, its state and a few controls, over the local network) follows it, brought forward to ease development ([BACKLOG.md](BACKLOG.md#tools)).
 
 ## Risks
 
