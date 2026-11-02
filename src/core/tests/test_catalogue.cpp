@@ -42,6 +42,7 @@ namespace
 			"CREATE TABLE object (id INTEGER PRIMARY KEY, kind TEXT, name TEXT);"
 			"CREATE TABLE measurement (object_id INTEGER, quantity TEXT, value REAL, preferred INTEGER);"
 			"CREATE TABLE property (object_id INTEGER, name TEXT, value TEXT, preferred INTEGER);"
+			"CREATE TABLE identifier (catalogue TEXT, value TEXT, object_id INTEGER);"
 			// Names out of id order, so a scan by name would give a different order.
 			"INSERT INTO object VALUES (1, 'star', 'Sol'), (2, 'star', 'B'), (3, 'star', 'C'), (4, 'star', '" +
 			long_name +
@@ -54,7 +55,10 @@ namespace
 			" (4, 'x', 0.0, 1), (4, 'y', 0.0, 1), (4, 'z', 1.0, 1), (4, 'absmag', 6.0, 1), (4, 'teff', 4000, 1),"
 			" (5, 'x', 0.0, 1), (5, 'y', 0.0, 1), (5, 'z', 0.0, 1), (5, 'absmag', 9.0, 1);" // not a star -> filtered out
 			"INSERT INTO property VALUES"
-			" (1, 'spectral_type', 'G2V', 1), (1, 'spectral_type', 'K0', 0), (3, 'spectral_type', 'M5V', 1);";
+			" (1, 'spectral_type', 'G2V', 1), (1, 'spectral_type', 'K0', 0), (3, 'spectral_type', 'M5V', 1);"
+			"INSERT INTO identifier VALUES"
+			" ('name', 'Sol', 1), ('spoken', 'Charlie Star', 3), ('HIP', '12345', 3),"           // HIP is not a spoken name
+			" ('name', 'Bee', 2), ('name', 'Planet Pee', 5);";                                   // not loaded: no position, not a star
 			// 4: long name truncated, no spectral type
 		const int rc = sqlite3_exec(db, ddl.c_str(), nullptr, nullptr, nullptr);
 		sqlite3_close(db);
@@ -99,6 +103,24 @@ int main()
 
 		StcStar one[1];
 		check(stc_catalogue_load_stars(cat, one, 1) == 1, "capacity is respected");
+
+		// Voice: the proper names and spoken forms of the loaded stars, nothing else.
+		StcVoice* voice = stc_voice_open(cat);
+		check(voice != nullptr, "voice opens on the fixture");
+		check(stc_voice_phrase_count(voice) == 2, "two names: Sol and Charlie Star");
+		check(stc_voice_phrase(voice, 0) != nullptr && std::strcmp(stc_voice_phrase(voice, 0), "Sol") == 0,
+			"the nearer, brighter star first");
+		check(stc_voice_phrase(voice, 2) == nullptr, "a phrase past the end is null");
+		StcVoiceCommand command;
+		check(stc_voice_parse(voice, "Stellar, go to Charlie Star", "Stellar", &command) == STC_VOICE_GO_TO,
+			"go to, through the C ABI");
+		check(command.woken == 1 && command.star_id == 3 && std::strcmp(command.name, "Charlie Star") == 0,
+			"woken, the star and its name");
+		check(stc_voice_parse(voice, "show Bee", "", &command) == STC_VOICE_SHOW && command.star_id == -1,
+			"a star without a position is not matched");
+		check(stc_voice_parse(nullptr, "show Sol", "", &command) < 0, "a null voice is an error");
+		stc_voice_close(voice);
+		stc_voice_close(nullptr);
 	}
 	stc_catalogue_close(cat);
 	stc_catalogue_close(nullptr); // a null handle is ignored

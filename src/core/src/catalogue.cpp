@@ -2,6 +2,8 @@
 
 #include "sqlite3.h"
 
+#include <cmath>
+
 namespace stellar::core
 {
 	namespace
@@ -32,6 +34,21 @@ namespace stellar::core
 			"JOIN measurement AS x ON x.object_id = o.id AND x.quantity = 'x' AND x.preferred "
 			"JOIN measurement AS a ON a.object_id = o.id AND a.quantity = 'absmag' AND a.preferred "
 			"WHERE o.kind = 'star'";
+
+		// Proper names and spoken forms (the pipeline's `name` and `spoken` identifiers) of
+		// the stars kSelectStars returns, with what the magnitude needs. Joined the same way.
+		constexpr const char* kSelectSpokenNames =
+			"SELECT i.value, o.id, x.value, y.value, z.value, a.value, i.catalogue = 'name' "
+			"FROM identifier AS i "
+			"JOIN object AS o ON o.id = i.object_id AND o.kind = 'star' "
+			"JOIN measurement AS x ON x.object_id = o.id AND x.quantity = 'x' AND x.preferred "
+			"JOIN measurement AS a ON a.object_id = o.id AND a.quantity = 'absmag' AND a.preferred "
+			"LEFT JOIN measurement AS y ON y.object_id = o.id AND y.quantity = 'y' AND y.preferred "
+			"LEFT JOIN measurement AS z ON z.object_id = o.id AND z.quantity = 'z' AND z.preferred "
+			"WHERE i.catalogue IN ('name', 'spoken')";
+
+		// The Sun's apparent magnitude, for the star at the origin.
+		constexpr double kSunApparentMagnitude = -26.74;
 
 		// Copy a SQLite text column into a fixed field: truncated to fit, always
 		// NUL-terminated, empty when the column is NULL.
@@ -119,5 +136,32 @@ namespace stellar::core
 		}
 		sqlite3_finalize(stmt);
 		return written;
+	}
+
+	std::vector<SpokenName> Catalogue::spoken_names() const
+	{
+		std::vector<SpokenName> names;
+		sqlite3_stmt* stmt = nullptr;
+		if (sqlite3_prepare_v2(db_, kSelectSpokenNames, -1, &stmt, nullptr) != SQLITE_OK)
+		{
+			return names;
+		}
+		while (sqlite3_step(stmt) == SQLITE_ROW)
+		{
+			const unsigned char* text = sqlite3_column_text(stmt, 0);
+			const double x = sqlite3_column_double(stmt, 2);
+			const double y = sqlite3_column_double(stmt, 3);
+			const double z = sqlite3_column_double(stmt, 4);
+			const double absmag = sqlite3_column_double(stmt, 5);
+			const double distance = std::sqrt(x * x + y * y + z * z);
+			names.push_back(SpokenName{
+				text != nullptr ? reinterpret_cast<const char*>(text) : "",
+				sqlite3_column_int64(stmt, 1),
+				distance > 0.0 ? absmag + 5.0 * std::log10(distance) - 5.0 : kSunApparentMagnitude,
+				distance,
+				sqlite3_column_int(stmt, 6) != 0});
+		}
+		sqlite3_finalize(stmt);
+		return names;
 	}
 }
