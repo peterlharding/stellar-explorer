@@ -38,6 +38,7 @@ target_compile_options(sqlite3 PRIVATE
 add_library(stellar_core STATIC
 	src/astrometry.cpp
 	src/catalogue.cpp
+	src/voice.cpp
 	src/api.cpp)
 target_include_directories(stellar_core
 	PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -66,4 +67,9 @@ if(STELLAR_CORE_TESTS)
 	add_executable(test_catalogue tests/test_catalogue.cpp)
 	target_link_libraries(test_catalogue PRIVATE stellar_core sqlite3)
 	add_test(NAME catalogue COMMAND test_catalogue)
+
+	add_executable(test_voice tests/test_voice.cpp)
+	target_link_libraries(test_voice PRIVATE stellar_core)
+	target_include_directories(test_voice PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+	add_test(NAME voice COMMAND test_voice)
 endif()

@@ -26,6 +26,13 @@ public:
 	/** The star material's exposure in a headset, where the monitor's is too dim. */
 	static constexpr float HeadsetExposure = 0.25f;
 
+	/**
+	 * On the desktop: the material's own 0.04 left all but the brightest stars too faint on
+	 * a Mac's screen; 0.1, judged against 0.04 and 0.2 looking at Orion, shows the fainter
+	 * ones without crowding.
+	 */
+	static constexpr float DesktopExposure = 0.1f;
+
 	int32 GetStarCount() const { return StarCount; }
 
 	/**
@@ -33,6 +40,16 @@ public:
 	 * that looks brightest from its origin. INDEX_NONE if there is none.
 	 */
 	int32 FindStar(const FVector& Origin, const FVector& Direction, double MaxAngleDegrees) const;
+
+	/** The star with this catalogue id (StcStar.id), or INDEX_NONE. */
+	int32 FindById(int64 Id) const
+	{
+		const int32* Star = IndexById.Find(Id);
+		return Star != nullptr ? *Star : INDEX_NONE;
+	}
+
+	/** The catalogue the stars came from, for anything else that reads it (voice). */
+	const FString& GetCataloguePath() const { return CataloguePath; }
 
 	const FVector& GetPosition(int32 Star) const { return Positions[Star]; }
 	const FString& GetName(int32 Star) const { return Names[Star]; }
@@ -52,6 +69,8 @@ private:
 	TObjectPtr<UProceduralMeshComponent> Mesh;
 
 	int32 StarCount = 0;
+	FString CataloguePath;
+	TMap<int64, int32> IndexById;
 
 	// One entry per star, in the order of the mesh's sprites.
 	TArray<FVector> Positions;

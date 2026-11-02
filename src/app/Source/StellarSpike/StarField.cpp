@@ -64,6 +64,7 @@ void AStarField::BeginPlay()
 		return;
 	}
 	UE_LOG(LogStarField, Display, TEXT("Loaded %d stars from %s in %.2f s"), StarCount, *Path, FPlatformTime::Seconds() - Start);
+	CataloguePath = Path;
 
 	UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/M_Star.M_Star"));
 	if (Material == nullptr)
@@ -74,11 +75,10 @@ void AStarField::BeginPlay()
 	// The material's parameters can be set from the command line, for tuning on a device
 	// without regenerating the material: -StarExposure=, -StarSize= (BaseSize), -LimitingMag=.
 	UMaterialInstanceDynamic* Instance = UMaterialInstanceDynamic::Create(Material, this);
-	// The material's exposure suits a monitor; the Vision Pro, judged by eye, wants about six times more.
-	if (GEngine->XRSystem.IsValid() && GEngine->XRSystem->IsHeadTrackingAllowed())
-	{
-		Instance->SetScalarParameterValue(TEXT("Exposure"), HeadsetExposure);
-	}
+	// Exposures judged by eye: the Vision Pro wants about six times the material's own, a Mac's
+	// screen between two and three times.
+	const bool bHeadset = GEngine->XRSystem.IsValid() && GEngine->XRSystem->IsHeadTrackingAllowed();
+	Instance->SetScalarParameterValue(TEXT("Exposure"), bHeadset ? HeadsetExposure : DesktopExposure);
 	for (const TPair<const TCHAR*, FName>& Option : {TPair<const TCHAR*, FName>(TEXT("StarExposure="), TEXT("Exposure")),
 			 TPair<const TCHAR*, FName>(TEXT("StarSize="), TEXT("BaseSize")), TPair<const TCHAR*, FName>(TEXT("LimitingMag="), TEXT("LimitingMag"))})
 	{
@@ -115,6 +115,7 @@ bool AStarField::LoadStars(const FString& Path)
 	AbsoluteMagnitudes.Reserve(Stars.Num());
 	Names.Reserve(Stars.Num());
 	SpectralTypes.Reserve(Stars.Num());
+	IndexById.Reserve(Stars.Num());
 	Vertices.Reserve(Stars.Num() * 4);
 	Triangles.Reserve(Stars.Num() * 6);
 	Corners.Reserve(Stars.Num() * 4);
@@ -126,6 +127,7 @@ bool AStarField::LoadStars(const FString& Path)
 		// The catalogue frame is right-handed (ICRS); Unreal's is left-handed, so y flips.
 		const FVector Position(Star.x * UnitsPerParsec, -Star.y * UnitsPerParsec, Star.z * UnitsPerParsec);
 		const FLinearColor Colour = BlackbodyColour(Star.teff);
+		IndexById.Add(Star.id, Positions.Num());
 		Positions.Add(Position);
 		AbsoluteMagnitudes.Add(Star.absmag);
 		Names.Add(FString(UTF8_TO_TCHAR(Star.name)));

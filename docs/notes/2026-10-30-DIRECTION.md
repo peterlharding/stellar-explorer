@@ -367,3 +367,19 @@ What the spike would settle, as part 4 of [spikes/unreal-stars](../../spikes/unr
 - **Starting to listen:** a wake word against a gesture, tried in the headset.
 - **The answers to the deferred questions above,** with evidence, as the Vive spike gives ADR 0012 its evidence.
 
+
+### F10. A desktop console for the headset
+
+**Agreed, and brought forward (2 November 2026).**
+
+PLH, during the voice spike: on both the Mac and Windows, a desktop application that works as a controller for the headset, with a view of the space, control inputs in the manner of Google Maps and Google Earth (and perhaps of CAD programs such as Blender), and logging windows.
+PLH asked for it sooner rather than later, to ease development: every headset test of the voice spike ended with copying the log off the device to see what had happened, and a live log would have shown at once, for example, that Apple's recogniser writes "Siri" before correcting it to "Sirius".
+
+Points raised:
+
+- **Three parts.** A view of the space, a map to pan, zoom and orbit, showing where the headset viewer is, which way they face, the star kept, the Sun and the radius of visibility (F2); controls, among them typing a star's name to find it (no mishearing) and the settings of F1; and the headset's log, live.
+- **The same named actions.** The headset app offers a small control service on the local network and the console connects to it; what crosses is the named actions already planned for the panel, gestures and voice ("go to star 98924", "grid on"), one way, and the headset's state (position, facing, star kept) and log, the other.
+  The Vision Pro is reached over Wi-Fi from the Mac; on the PC the console talks to the Vive app on the same machine.
+- **Built as the same Unreal app in a second role.** The desktop build already draws the catalogue and links the core, so the map view comes nearly free; a web page would be lighter but would need a star renderer of its own.
+
+First slice, to help development at once: the control service and the log stream, the headset's state, and a few actions (find a star by name, go there, let go, return to the Sun), with the map as the desktop's existing view, before the Google Earth style controls and the settings.

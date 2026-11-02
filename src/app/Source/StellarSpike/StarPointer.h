@@ -36,6 +36,18 @@ public:
 
 	void SetStarField(AStarField* InStarField) { StarField = InStarField; }
 
+	/** Keep a star as a pinch would, or with INDEX_NONE let the kept one go: for spoken commands. */
+	void Keep(int32 Star);
+
+	/** The star kept, or else the one pointed at, or INDEX_NONE: what "go there" means. */
+	int32 GetTarget() const { return Selected != INDEX_NONE ? Selected : Hovered; }
+
+	/** In a headset with hands, whether the hand that does not point is pinched on its own (push to talk). */
+	bool IsOtherHandPinched() const;
+
+	/** A line just above the panel, for what voice heard and did; empty hides it. Active is brighter. */
+	void SetVoiceLine(const FString& Text, bool bActive);
+
 	virtual void Tick(float DeltaSeconds) override;
 
 protected:
@@ -153,6 +165,10 @@ private:
 	/** What a pinch would do now, at the bottom of the panel. */
 	UPROPERTY()
 	TObjectPtr<UTextRenderComponent> Hint;
+
+	/** What voice heard and did, just above the panel. */
+	UPROPERTY()
+	TObjectPtr<UTextRenderComponent> VoiceLine;
 
 	FHand Hands[3];
 	int32 Hovered = INDEX_NONE;

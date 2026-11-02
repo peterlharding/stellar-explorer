@@ -20,7 +20,7 @@ extern "C" {
 #endif
 
 /* ABI version of this library; a caller checks it matches this header. */
-#define STC_ABI_VERSION 2u
+#define STC_ABI_VERSION 3u
 uint32_t stc_abi_version(void);
 
 /* A position in parsecs, right-handed ICRS equatorial Cartesian. POD, by value. */
@@ -83,6 +83,59 @@ int64_t stc_catalogue_star_count(const StcCatalogue* catalogue);
 /* Fill up to `capacity` stars into `out`, returning the number written, or a
  * negative value on error. Call stc_catalogue_star_count first to size `out`. */
 int32_t stc_catalogue_load_stars(const StcCatalogue* catalogue, StcStar* out, int32_t capacity);
+
+/* ---- Voice ----------------------------------------------------------------
+ *
+ * Turns what a speech recogniser heard into a command and a star. The recogniser
+ * itself is the platform's (the app's job); the words and the names are matched
+ * here, the same on every platform. Names are the catalogue's proper names and
+ * spoken forms of its designations ("Delta Pavonis" for "del Pav"), matched with
+ * some tolerance for mishearing.
+ */
+
+/* An opaque handle to the names of an open catalogue, ready for matching. */
+typedef struct StcVoice StcVoice;
+
+/* What a command asks for. */
+typedef enum StcVoiceAction
+{
+	STC_VOICE_NONE = 0,          /* not a command */
+	STC_VOICE_SHOW = 1,          /* "show Sirius", or a star's name alone */
+	STC_VOICE_GO_TO = 2,         /* "go to Delta Pavonis" */
+	STC_VOICE_RETURN_TO_SUN = 3, /* "return to the Sun" */
+	STC_VOICE_LET_GO = 4,        /* "let go" of the star kept */
+	STC_VOICE_GO_THERE = 5,      /* "go there": to the star kept or pointed at, no name needed */
+	STC_VOICE_BACK_OFF = 6,      /* "back off": further from the star kept or pointed at */
+	STC_VOICE_CLOSER = 7         /* "closer": nearer the star kept or pointed at */
+} StcVoiceAction;
+
+/* Capacity (including the NUL) of StcVoiceCommand's target: what was heard. */
+#define STC_VOICE_TARGET_CAP 96
+
+typedef struct StcVoiceCommand
+{
+	int32_t action;                     /* an StcVoiceAction */
+	int32_t woken;                      /* 1 if the text held the wake word; the command follows its last use */
+	int64_t star_id;                    /* the star named, as StcStar.id; -1 if none was named or none matched */
+	char name[STC_NAME_CAP];            /* the name matched, as the catalogue writes it; empty if none */
+	char target[STC_VOICE_TARGET_CAP];  /* the words heard where a star's name belongs, normalised; may be empty */
+} StcVoiceCommand;
+
+/* Read the names from an open catalogue; NULL on error. The catalogue may be closed after. */
+StcVoice* stc_voice_open(const StcCatalogue* catalogue);
+
+/* Free a StcVoice. NULL is ignored. */
+void stc_voice_close(StcVoice* voice);
+
+/* Parse `text` (UTF-8) into `out`, returning its action, or a negative value on error.
+ * With a non-empty `wake_word` ("Stellar"), the command is what follows the wake
+ * word's last use, and `out->woken` says whether it was heard. */
+int32_t stc_voice_parse(const StcVoice* voice, const char* text, const char* wake_word, StcVoiceCommand* out);
+
+/* The names, once each, brightest star first: vocabulary a recogniser can be given.
+ * The strings belong to `voice` and last as long as it does. */
+int32_t stc_voice_phrase_count(const StcVoice* voice);
+const char* stc_voice_phrase(const StcVoice* voice, int32_t index);
 
 #ifdef __cplusplus
 } /* extern "C" */
