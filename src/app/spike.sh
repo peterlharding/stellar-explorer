@@ -6,6 +6,7 @@
 #   ./spike.sh measure    circle the Sun for 30 s, log frame times, take a screenshot
 #   ./spike.sh look RA,DEC  screenshot the sky from the Sun, e.g. 5.6,0 for Orion
 #   ./spike.sh vive       run in the headset through SteamVR (Windows)
+#   ./spike.sh console HOST   the desktop app with its console panel steering the app on HOST (a headset)
 #   ./spike.sh package    cook a standalone build so shaders ship (no first-run wait)
 #   ./spike.sh visionos   package for Apple Vision Pro (needs CodeSigningTeam in Config/UserEngine.ini)
 #   ./spike.sh install UDID   install the packaged app on a paired Vision Pro
@@ -81,7 +82,12 @@ material)
 		-script="$(native "$HERE/Scripts/make_star_material.py")" -unattended -nosplash -nop4
 	;;
 run)
-	"$EDITOR" "$PROJECT" -game -windowed -ResX=1600 -ResY=900 -log
+	# One window, the console panel in it; the log is in the panel and Saved/Logs, not a window of its own.
+	"$EDITOR" "$PROJECT" -game -windowed -ResX=1600 -ResY=900
+	;;
+console)
+	# Connects to the control service of the app on $2 (port 47800 unless given as HOST:PORT).
+	"$EDITOR" "$PROJECT" -game -windowed -ResX=1600 -ResY=900 -Console="${2:?usage: ./spike.sh console HOST[:PORT]}"
 	;;
 measure)
 	"$EDITOR" "$PROJECT" -game -windowed -ResX=1600 -ResY=900 -Autopilot -QuitAfter=30 \

@@ -12,6 +12,8 @@ public class StellarSpike : ModuleRules
 		PrivateDependencyModuleNames.Add("StellarCore");
 		// The desktop look reads the mouse from Slate (StarViewerPawn).
 		PrivateDependencyModuleNames.AddRange(new[] { "Slate", "SlateCore" });
+		// The control service the desktop console talks to (StarControl): JSON lines over TCP.
+		PrivateDependencyModuleNames.AddRange(new[] { "Networking", "Sockets", "Json" });
 		if (Target.Platform == UnrealTargetPlatform.Mac || Target.Platform == UnrealTargetPlatform.VisionOS)
 		{
 			// Voice commands use Apple's speech recogniser on the microphone (VoiceRecognizer.cpp).

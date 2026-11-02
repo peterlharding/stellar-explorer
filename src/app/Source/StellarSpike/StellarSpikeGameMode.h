@@ -15,6 +15,7 @@ class AStarField;
  *   -QuitAfter=<s>      log the frame times, take a screenshot and quit
  *   -TestObject         put a lit cube 1 m in front of a headset's start, to tell
  *                       "nothing renders" from "the stars do not show"
+ *   -Console=<host>[:<port>]  be a console for the app on that host (AStarConsole)
  *   -SkySphere[=<pc>]   enclose the view in an opaque black sphere, by default
  *                       beyond the furthest star; always done in a headset
  *                       (see SpawnSkySphere)

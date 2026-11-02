@@ -2,15 +2,12 @@
 
 #include "Camera/CameraComponent.h"
 #include "Components/InputComponent.h"
-#include "Framework/Application/SlateApplication.h"
 #include "GameFramework/FloatingPawnMovement.h"
 #include "GameFramework/PlayerController.h"
 #include "MotionControllerComponent.h"
 
 namespace
 {
-	/** How far the view turns as the cursor moves one pixel, dragging. */
-	constexpr double LookDegreesPerPixel = 0.15;
 	constexpr float ShiftSpeedFactor = 10.0f;
 }
 
@@ -20,6 +17,10 @@ AStarViewerPawn::AStarViewerPawn()
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Camera->SetupAttachment(RootComponent);
 	Camera->bLockToHmd = true;
+	// On the desktop the view is the control rotation, which the mouse, the commands and the
+	// scripted views set; without this the camera took the pawn's own rotation, which follows
+	// it only in yaw and only through the engine's input, so nothing else could turn the view.
+	Camera->bUsePawnControlRotation = true;
 
 	// The controllers track in their own right when the headset has them; on a headset with hand
 	// tracking, or none, they simply never report IsTracked(). The aim pose points where the
@@ -35,6 +36,8 @@ AStarViewerPawn::AStarViewerPawn()
 void AStarViewerPawn::UseHeadset()
 {
 	bHeadset = true;
+	// In a headset the head turns the view.
+	Camera->bUsePawnControlRotation = false;
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationRoll = false;
 }
@@ -43,10 +46,12 @@ void AStarViewerPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 	// The engine's mouse look turns the view whenever the mouse moves over the window, button
-	// or not, unless the mouse is captured; with it free (Config/DefaultInput.ini) the view
-	// spun as the cursor crossed it. Tick turns it on a right-button drag instead.
+	// or not, unless the mouse is captured, and it is left free (Config/DefaultInput.ini); the
+	// pointer looks on a drag instead (FDesktopMouse). Moving up and down is E and Q alone, in
+	// Tick: the engine's binding has Control too, which on a Mac is half of a right-click.
 	PlayerInputComponent->AxisBindings.RemoveAll([](const FInputAxisBinding& Binding) {
-		return Binding.AxisName == TEXT("DefaultPawn_Turn") || Binding.AxisName == TEXT("DefaultPawn_LookUp");
+		return Binding.AxisName == TEXT("DefaultPawn_Turn") || Binding.AxisName == TEXT("DefaultPawn_LookUp") ||
+			Binding.AxisName == TEXT("DefaultPawn_MoveUp");
 	});
 }
 
@@ -58,7 +63,11 @@ void AStarViewerPawn::Tick(float DeltaSeconds)
 	{
 		return;
 	}
-
+	const float Up = (Player->IsInputKeyDown(EKeys::E) ? 1.0f : 0.0f) - (Player->IsInputKeyDown(EKeys::Q) ? 1.0f : 0.0f);
+	if (Up != 0.0f)
+	{
+		AddMovementInput(FVector::UpVector, Up);
+	}
 	if (UFloatingPawnMovement* Movement = Cast<UFloatingPawnMovement>(GetMovementComponent()))
 	{
 		if (BaseSpeed <= 0.0f)
@@ -68,25 +77,4 @@ void AStarViewerPawn::Tick(float DeltaSeconds)
 		const bool bFast = Player->IsInputKeyDown(EKeys::LeftShift) || Player->IsInputKeyDown(EKeys::RightShift);
 		Movement->MaxSpeed = BaseSpeed * (bFast ? ShiftSpeedFactor : 1.0f);
 	}
-
-	// The button and the cursor as Slate sees them: with the mouse left free, the game's own
-	// input saw only the first right-button press after launch. A drag starts over the view.
-	FVector2D InView;
-	const bool bHeld = FSlateApplication::IsInitialized() && FSlateApplication::Get().GetPressedMouseButtons().Contains(EKeys::RightMouseButton);
-	if (!bHeld || (!DragFrom.IsSet() && !Player->GetMousePosition(InView.X, InView.Y)))
-	{
-		DragFrom.Reset();
-		return;
-	}
-	const FVector2D Cursor = FSlateApplication::Get().GetCursorPos();
-	if (DragFrom.IsSet())
-	{
-		// Drag right to turn right, up to look up; never over the poles.
-		const FVector2D Moved = Cursor - DragFrom.GetValue();
-		FRotator Rotation = Player->GetControlRotation();
-		Rotation.Yaw += Moved.X * LookDegreesPerPixel;
-		Rotation.Pitch = FMath::Clamp(FRotator::NormalizeAxis(Rotation.Pitch - Moved.Y * LookDegreesPerPixel), -89.0, 89.0);
-		Player->SetControlRotation(Rotation);
-	}
-	DragFrom = Cursor;
 }

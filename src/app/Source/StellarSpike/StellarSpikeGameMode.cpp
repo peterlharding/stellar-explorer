@@ -17,6 +17,9 @@
 #include "Misc/CommandLine.h"
 #include "ProceduralMeshComponent.h"
 #include "StarField.h"
+#include "StarActions.h"
+#include "StarConsole.h"
+#include "StarControl.h"
 #include "StarPointer.h"
 #include "StarVoice.h"
 #include "StarViewerPawn.h"
@@ -67,7 +70,21 @@ void AStellarSpikeGameMode::StartPlay()
 	StarField = GetWorld()->SpawnActor<AStarField>();
 	AStarPointer* Pointer = GetWorld()->SpawnActor<AStarPointer>();
 	Pointer->SetStarField(StarField);
-	GetWorld()->SpawnActor<AStarVoice>()->Setup(StarField, Pointer);
+	AStarActions* Actions = GetWorld()->SpawnActor<AStarActions>();
+	Actions->Setup(StarField, Pointer);
+	// On the desktop the console panel steers this app, or with -Console=host another; an app
+	// that is not steering another listens, and can be steered.
+	FString ConsoleTarget;
+	FParse::Value(FCommandLine::Get(), TEXT("Console="), ConsoleTarget);
+	if (!(GEngine->XRSystem.IsValid() && GEngine->XRSystem->IsHeadTrackingAllowed()))
+	{
+		GetWorld()->SpawnActor<AStarConsole>()->Setup(Actions, Pointer, StarField, ConsoleTarget);
+	}
+	if (ConsoleTarget.IsEmpty())
+	{
+		GetWorld()->SpawnActor<AStarVoice>()->Setup(Actions, Pointer);
+		GetWorld()->SpawnActor<AStarControl>()->Setup(Actions, Pointer, StarField);
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("TestObject")))
 	{
 		SpawnTestObject();

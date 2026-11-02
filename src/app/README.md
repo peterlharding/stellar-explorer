@@ -13,7 +13,8 @@ cd /mnt/d/src/Projects/stellar-explorer   # on a Windows drive, not WSL's own fi
 make catalogue                            # build data/catalogue.sqlite (once)
 cd src/app
 ./spike.sh build && ./spike.sh material   # compile the editor target; generate the star material
-./spike.sh run                            # fly the catalogue in a window (WASD, right-drag to look)
+./spike.sh run                            # the catalogue in a window: click a star, drag to look, scroll to move; Tab for the console
+./spike.sh console HOST                   # the same, its console panel steering the app on HOST (a headset)
 ./spike.sh vive                           # run in the headset (Windows, through SteamVR/VIVE runtime)
 ./spike.sh package                        # cook a standalone Win64 build (ships shaders; no first-run wait)
 ```

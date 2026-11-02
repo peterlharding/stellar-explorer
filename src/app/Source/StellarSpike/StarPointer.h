@@ -5,6 +5,7 @@
 #include "StarPointer.generated.h"
 
 class AStarField;
+class FDesktopMouse;
 class UInstancedStaticMeshComponent;
 class UMaterialInstanceDynamic;
 class UProceduralMeshComponent;
@@ -18,7 +19,9 @@ class UTextRenderComponent;
  * set otherwise) casts a ray from an estimated shoulder through the hand, and a pinch (thumb tip to
  * index tip) selects. In a headset with controllers instead (the Vive) the ray is the controller's
  * aim and the trigger selects. The other hand (or controller) is tracked only for the gesture that
- * quits. On the desktop the ray is the view's centre and the left mouse button selects. The star pointed at is ringed and described
+ * quits. On the desktop the ray runs under the cursor and the mouse works as in Blender, the
+ * star kept the pivot: a click keeps the star under it (on empty sky, lets go), middle-drag
+ * orbits, Shift + middle-drag pans, the wheel zooms, "." or F faces it (FDesktopMouse). The star pointed at is ringed and described
  * in a panel at the bottom right of the view, which follows the head. In a headset the ray
  * is off at start, and a first pinch turns it on. A pinch then keeps the
  * star: it is ringed in another colour, the panel stays on it, and the ray goes until two
@@ -39,8 +42,32 @@ public:
 	/** Keep a star as a pinch would, or with INDEX_NONE let the kept one go: for spoken commands. */
 	void Keep(int32 Star);
 
+	/**
+	 * Which way is up on the desktop's screen, in this app's frame: the celestial north pole
+	 * at start, or another (the galactic north pole) by SetViewUp. Every turn keeps it up.
+	 */
+	void SetViewUp(const FVector& Up);
+	/** The view looking along Forward with ViewUp up. */
+	FRotator ViewRotation(const FVector& Forward) const;
+
+	/** The star kept, and the one pointed at; INDEX_NONE for none. */
+	int32 GetKept() const { return Selected; }
+	int32 GetPointed() const { return Hovered; }
+
 	/** The star kept, or else the one pointed at, or INDEX_NONE: what "go there" means. */
 	int32 GetTarget() const { return Selected != INDEX_NONE ? Selected : Hovered; }
+
+	/**
+	 * Move the view as the mouse would, in its units (pixels dragged, notches of the wheel):
+	 * for commands ("orbit 100 0"), and for testing the mouse's moves without a mouse.
+	 */
+	void MoveView(const FVector2D& Turn, const FVector2D& Orbit, const FVector2D& Pan, float Zoom)
+	{
+		Queued.Turn += Turn;
+		Queued.Orbit += Orbit;
+		Queued.Pan += Pan;
+		Queued.Zoom += Zoom;
+	}
 
 	/** In a headset with hands, whether the hand that does not point is pinched on its own (push to talk). */
 	bool IsOtherHandPinched() const;
@@ -52,6 +79,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 
 private:
 	struct FRay
@@ -104,6 +132,8 @@ private:
 	/** Whether either motion controller is tracked this frame, without disturbing the hand state. */
 	bool AnyControllerTracked() const;
 	void Select(int32 Star);
+	/** On the desktop: the mouse's gestures and MoveView's (FDesktopMouse). */
+	void UseMouse(const FVector& Head, const FRotator& HeadRotation);
 	void PlaceRing(UProceduralMeshComponent* Ring, int32 Star, const FVector& Head) const;
 	void PlacePanel(const FVector& Head, const FRotator& HeadRotation, float DeltaSeconds);
 	void ShowStar(int32 Star, const FLinearColor& Colour);
@@ -170,7 +200,25 @@ private:
 	UPROPERTY()
 	TObjectPtr<UTextRenderComponent> VoiceLine;
 
+	struct FViewMove
+	{
+		FVector2D Turn = FVector2D::ZeroVector;
+		FVector2D Orbit = FVector2D::ZeroVector;
+		FVector2D Pan = FVector2D::ZeroVector;
+		float Zoom = 0.0f;
+		bool IsEmpty() const { return Turn.IsZero() && Orbit.IsZero() && Pan.IsZero() && Zoom == 0.0f; }
+	};
+	/** View moves asked for by command, made with the mouse's next. */
+	FViewMove Queued;
+	FVector ViewUp = FVector::UpVector;
+	/** Whether looking along Forward is too near straight up or down (to ViewUp) to turn further. */
+	bool IsNearPole(const FVector& Forward) const;
+	/** When the mouse last moved the view: the hover ring stays off for a moment after. */
+	double LastViewMove = -1.0e9;
+
 	FHand Hands[3];
+	/** The desktop's mouse, read through Slate; null in a headset. */
+	TSharedPtr<FDesktopMouse> Mouse;
 	int32 Hovered = INDEX_NONE;
 	int32 Selected = INDEX_NONE;
 	/** Index into Hands of the pointing hand: 0 left, 1 right, or MouseHand on the desktop. */

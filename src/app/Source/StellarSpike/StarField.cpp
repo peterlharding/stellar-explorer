@@ -73,14 +73,16 @@ void AStarField::BeginPlay()
 		return;
 	}
 	// The material's parameters can be set from the command line, for tuning on a device
-	// without regenerating the material: -StarExposure=, -StarSize= (BaseSize), -LimitingMag=.
+	// without regenerating the material: -StarExposure=, -StarSize= (BaseSize), -LimitingMag=,
+	// -StarSaturation=.
 	UMaterialInstanceDynamic* Instance = UMaterialInstanceDynamic::Create(Material, this);
 	// Exposures judged by eye: the Vision Pro wants about six times the material's own, a Mac's
 	// screen between two and three times.
 	const bool bHeadset = GEngine->XRSystem.IsValid() && GEngine->XRSystem->IsHeadTrackingAllowed();
 	Instance->SetScalarParameterValue(TEXT("Exposure"), bHeadset ? HeadsetExposure : DesktopExposure);
 	for (const TPair<const TCHAR*, FName>& Option : {TPair<const TCHAR*, FName>(TEXT("StarExposure="), TEXT("Exposure")),
-			 TPair<const TCHAR*, FName>(TEXT("StarSize="), TEXT("BaseSize")), TPair<const TCHAR*, FName>(TEXT("LimitingMag="), TEXT("LimitingMag"))})
+			 TPair<const TCHAR*, FName>(TEXT("StarSize="), TEXT("BaseSize")), TPair<const TCHAR*, FName>(TEXT("LimitingMag="), TEXT("LimitingMag")),
+			 TPair<const TCHAR*, FName>(TEXT("StarSaturation="), TEXT("Saturation"))})
 	{
 		float Value = 0.0f;
 		if (FParse::Value(FCommandLine::Get(), Option.Key, Value))
