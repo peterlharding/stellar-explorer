@@ -48,7 +48,7 @@ It is the same C++ code and the same 215 MB SQLite catalogue as the other two ta
 
 ## Harmless and still open
 
-- **First-run shader compile.** The first launch on this machine spent about 27 minutes compiling shaders before the view appeared; later launches are quick. A packaged Win64 build (`BuildCookRun -platform=Win64`) would ship the shaders and remove the wait; not yet done.
+- **First-run shader compile.** The first launch on this machine spent about 27 minutes compiling shaders before the view appeared; later launches are quick. Fixed: `./spike.sh package` cooks a standalone Win64 build that ships the shaders, so it starts without the wait (built and run, confirmed 2 November 2026).
 - **No controller shown in view.** Most Vive apps show the controller, or a wand, in the field of view; this spike shows only the ray. A simple wand or rod is in the [backlog](../../docs/BACKLOG.md#interaction) as an application feature.
 - **The controller's other inputs are unused.** The Vive controller has a menu button, a circular trackpad with a click, and two grip buttons besides the trigger; only the trigger is read. Mapping the rest to named actions is in the [backlog](../../docs/BACKLOG.md#interaction).
 - **Exposure not tuned.** The Vision Pro's star exposure is tuned (0.25); the Vive's is not yet, and a clean in-headset frame-rate figure is still to take (the first run was busy compiling shaders).

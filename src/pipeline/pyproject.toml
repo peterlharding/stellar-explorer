@@ -1,6 +1,6 @@
 [project]
 name = "stellar-pipeline"
-version = "0.0.0"
+version = "0.1.0"
 description = "Builds the Stellar Explorer catalogue database from public star and exoplanet catalogues"
 license = "MIT"
 requires-python = ">=3.13"

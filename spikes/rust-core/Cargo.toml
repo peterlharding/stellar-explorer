@@ -1,0 +1,17 @@
+[package]
+name = "stellar-core-spike"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "stellar_core_spike"
+# A static library with a C ABI, for Unreal to link (ADR 0014).
+crate-type = ["staticlib"]
+
+# Panics must abort, not unwind, because unwinding across the C ABI is undefined.
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"

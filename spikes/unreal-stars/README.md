@@ -1,7 +1,9 @@
 # Unreal spike: the catalogue in Unreal Engine 5.8
 
-A throwaway project that answers one question before ADR 0007 (Godot) is reconsidered: can Unreal Engine render the Stellar Explorer catalogue well, on the desktop, the HTC Vive Pro 2 and the Apple Vision Pro?
-It is not the app; the app will live in `src/app/` once the engine is decided.
+> **Graduated.** Unreal was chosen ([ADR 0012](../../docs/decisions/0012-unreal-front-end.md)) and the project moved to [`src/app/`](../../src/app/README.md); run it from there now. This directory is kept as the record of the spike's bring-up — the README below, with [VISIONOS.md](VISIONOS.md), [VIVE.md](VIVE.md) and [VOICE.md](VOICE.md).
+
+A throwaway project that answered one question before ADR 0007 (Godot) was reconsidered: can Unreal Engine render the Stellar Explorer catalogue well, on the desktop, the HTC Vive Pro 2 and the Apple Vision Pro?
+It was not the app itself; once Unreal was chosen the project graduated to `src/app/` (see the note above).
 
 ## How it is built
 
@@ -55,7 +57,7 @@ Needs Unreal 5.8.4 for Windows, Visual Studio with the C++ game workload, HTC's 
 ```sh
 cd /mnt/d/src/Projects/stellar-explorer   # on a Windows drive, not in WSL's own filesystem
 make catalogue                            # builds data/catalogue.sqlite
-cd spikes/unreal-stars
+cd src/app
 ./spike.sh build && ./spike.sh material
 ./spike.sh run                            # on the monitor first
 ./spike.sh vive                           # then in the headset
@@ -67,7 +69,9 @@ Reaching the headset took six fixes (see [VIVE.md](VIVE.md), with their evidence
 
 **Working:** the whole catalogue renders in the headset, a controller points and its trigger selects a star, and the panel adapts its wording to the trigger; see [VIVE.md](VIVE.md).
 
-### Part 4: Voice commands (not started, after the Vive)
+### Part 4: Voice commands
+
+**Under way (2 November 2026):** working on the Mac and the Vision Pro with Apple's recogniser, by wake word in the headset; star names are the weak spot, and "go there" (to the star pointed at) the answer so far. The log, with its evidence, is [VOICE.md](VOICE.md).
 
 Can the app be driven by speech — a handful of verbs and a few dozen star names, including awkward ones like "Delta Pavonis" — accurately and fast enough to be worth building, on both headsets, ideally with one offline recogniser? It runs after the Vive test so it can be tried on both. See the [direction notes](../../docs/notes/2026-10-30-DIRECTION.md) (F9).
 

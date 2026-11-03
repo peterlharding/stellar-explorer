@@ -93,7 +93,7 @@ flowchart TB
         f4["Audio<br/>narration, ambience"]
         f1 ~~~ f2 ~~~ f3 ~~~ f4
     end
-    desktop["Desktop<br/>Windows, Linux, macOS"]
+    desktop["Desktop<br/>Windows, macOS"]
     vive["HTC Vive<br/>OpenXR through SteamVR"]
     avp["Apple Vision Pro<br/>Compositor Services, Metal"]
 
@@ -129,18 +129,18 @@ Because the core has no engine dependency, it gets ordinary unit tests: known st
 | `docs/` | This documentation |
 | `src/pipeline/` | Python ingest: public catalogues to `catalogue.sqlite` |
 | `src/core/` | Core library and its tests |
-| `src/app/` | Godot project |
+| `src/app/` | Unreal project (the front end) |
 | `tours/` | Tour files |
 | `scenarios/` | A neutral example scenario; `scenarios/private/` is a separate private repository, git-ignored here |
 | `scripts/` | Repository tooling: documentation link check, version fields |
 | `data/` | Downloaded catalogues and built databases; git-ignored |
 | `release_notes/` | One user-facing file per release |
 
-Only `docs/`, `src/pipeline/`, `scripts/` and `release_notes/` exist so far; the rest appear with the phase that needs them.
+Only `docs/`, `src/pipeline/`, `src/core/`, `scripts/` and `release_notes/` exist so far; the rest appear with the phase that needs them.
 
 ## Data and database
 
-The catalogue is one SQLite file, built offline by a Python pipeline and opened read-only by the app, with a second writable file for user content. SQLite runs unchanged on Windows, Linux, macOS and visionOS, and can be interrogated with any SQL tool.
+The catalogue is one SQLite file, built offline by a Python pipeline and opened read-only by the app, with a second writable file for user content. SQLite runs unchanged on Windows, macOS and visionOS, and can be interrogated with any SQL tool.
 
 ### Sources for v1
 
@@ -282,7 +282,7 @@ The two headsets differ in runtime, input and computing power, so the app talks 
 
 | | HTC Vive | Apple Vision Pro |
 | --- | --- | --- |
-| Runtime | OpenXR through SteamVR, on a Windows or Linux PC | visionOS Compositor Services with Metal; no OpenXR |
+| Runtime | OpenXR through SteamVR, on a Windows PC | visionOS Compositor Services with Metal; no OpenXR |
 | Computing | The PC's graphics card | The headset's own chip, or a Mac streaming to it |
 | Primary input | Two tracked wand controllers | Eyes and hand pinches |
 | Optional input | | [PS VR2 Sense controllers](https://www.uploadvr.com/visionos-26-out-now-apple-vision-pro/), tracked in six degrees of freedom since visionOS 26 |

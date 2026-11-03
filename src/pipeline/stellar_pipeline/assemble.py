@@ -135,9 +135,15 @@ def _hyg_identifiers(star: HygStar) -> list[Identifier]:
         if star.bayer is not None:
             value = identifiers.bayer(star.bayer, star.constellation)
             found.append(Identifier(identifiers.BAYER, value, HYG.key))
+            found.extend(
+                Identifier(identifiers.SPOKEN, said, HYG.key) for said in identifiers.spoken(value)
+            )
         if star.flamsteed is not None:
             value = identifiers.flamsteed(star.flamsteed, star.constellation)
             found.append(Identifier(identifiers.FLAMSTEED, value, HYG.key))
+            found.extend(
+                Identifier(identifiers.SPOKEN, said, HYG.key) for said in identifiers.spoken(value)
+            )
         if star.variable is not None:
             value = f"{star.variable} {star.constellation}"
             found.append(Identifier(identifiers.VARIABLE, value, HYG.key))

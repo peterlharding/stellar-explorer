@@ -22,6 +22,28 @@ def test_flamsteed() -> None:
 
 @pytest.mark.parametrize(
     ("designation", "expected"),
+    [
+        ("del Pav", ["Delta Pavonis"]),
+        ("alf1 Cen", ["Alpha 1 Centauri", "Alpha Centauri"]),
+        ("ksi UMa", ["Xi Ursae Majoris"]),
+        ("tet1 Ori", ["Theta 1 Orionis", "Theta Orionis"]),
+        ("61 Cyg", ["61 Cygni"]),
+        ("p Eri", ["p Eridani"]),
+        ("eps Boo", ["Epsilon Bootis"]),
+    ],
+)
+def test_spoken_forms_write_out_letters_and_genitives(
+    designation: str, expected: list[str]
+) -> None:
+    assert identifiers.spoken(designation) == expected
+
+
+def test_every_constellation_has_a_genitive() -> None:
+    assert len(identifiers.GENITIVES) == 88
+
+
+@pytest.mark.parametrize(
+    ("designation", "expected"),
     [("Gl 244A", "244A"), ("GJ 1293", "1293"), ("Gl 4.1", "4.1"), ("Gl   4", "4")],
 )
 def test_gliese_numbers_drop_the_prefix(designation: str, expected: str) -> None:
