@@ -101,7 +101,17 @@ bool AStarField::LoadStars(const FString& Path)
 	FStarCatalogue Catalogue(Path);
 	if (!Catalogue.IsOpen())
 	{
-		UE_LOG(LogStarField, Error, TEXT("Cannot open catalogue %s"), *Path);
+		// Say whether it is missing or unreadable, or built for another schema.
+		const int32 Schema = stc_catalogue_schema(TCHAR_TO_UTF8(*Path));
+		if (Schema >= 0 && Schema != STC_SCHEMA_VERSION)
+		{
+			UE_LOG(LogStarField, Error, TEXT("Cannot open catalogue %s: its schema is %d, but this build reads %d; rebuild it with make catalogue"), *Path, Schema,
+				STC_SCHEMA_VERSION);
+		}
+		else
+		{
+			UE_LOG(LogStarField, Error, TEXT("Cannot open catalogue %s"), *Path);
+		}
 		return false;
 	}
 	const TArray<StcStar>& Stars = Catalogue.Stars();

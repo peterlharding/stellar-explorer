@@ -70,16 +70,61 @@ namespace stellar::core
 		}
 	}
 
+	namespace
+	{
+		sqlite3* open_read_only(const char* path)
+		{
+			if (path == nullptr)
+			{
+				return nullptr;
+			}
+			sqlite3* db = nullptr;
+			if (sqlite3_open_v2(path, &db, SQLITE_OPEN_READONLY, nullptr) != SQLITE_OK)
+			{
+				sqlite3_close(db); // safe on the handle open_v2 returns even on failure
+				return nullptr;
+			}
+			return db;
+		}
+
+		// PRAGMA user_version, where the pipeline writes its SCHEMA_VERSION; negative when
+		// the file is not a database (SQLite reads nothing until the first statement).
+		int32_t user_version(sqlite3* db)
+		{
+			sqlite3_stmt* stmt = nullptr;
+			int32_t version = -1;
+			if (sqlite3_prepare_v2(db, "PRAGMA user_version", -1, &stmt, nullptr) == SQLITE_OK && sqlite3_step(stmt) == SQLITE_ROW)
+			{
+				version = sqlite3_column_int(stmt, 0);
+			}
+			sqlite3_finalize(stmt);
+			return version;
+		}
+	}
+
+	int32_t Catalogue::schema(const char* path)
+	{
+		sqlite3* db = open_read_only(path);
+		if (db == nullptr)
+		{
+			return -1;
+		}
+		const int32_t version = user_version(db);
+		sqlite3_close(db);
+		return version;
+	}
+
 	Catalogue* Catalogue::open(const char* path)
 	{
-		if (path == nullptr)
+		sqlite3* db = open_read_only(path);
+		if (db == nullptr)
 		{
 			return nullptr;
 		}
-		sqlite3* db = nullptr;
-		if (sqlite3_open_v2(path, &db, SQLITE_OPEN_READONLY, nullptr) != SQLITE_OK)
+		// A catalogue from another pipeline's schema would be misread, not just fail.
+		if (user_version(db) != STC_SCHEMA_VERSION)
 		{
-			sqlite3_close(db); // safe on the handle open_v2 returns even on failure
+			sqlite3_close(db);
 			return nullptr;
 		}
 		// Keep any temporary table a query needs (a sort, a GROUP BY) in memory, since a

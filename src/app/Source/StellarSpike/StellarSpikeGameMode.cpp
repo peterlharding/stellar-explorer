@@ -23,6 +23,7 @@
 #include "StarPointer.h"
 #include "StarVoice.h"
 #include "StarViewerPawn.h"
+#include "stellar_core.h"
 #include "UnrealClient.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogStellarSpike, Log, All);
@@ -66,7 +67,16 @@ void AStellarSpikeGameMode::InitGame(const FString& MapName, const FString& Opti
 
 void AStellarSpikeGameMode::StartPlay()
 {
-	UE_LOG(LogStellarSpike, Display, TEXT("Build %s on %s, built %s"), STELLAR_SPIKE_COMMIT, STELLAR_SPIKE_BRANCH, STELLAR_SPIKE_BUILT);
+	UE_LOG(LogStellarSpike, Display, TEXT("Stellar Explorer: %s"), *StellarBuild());
+	// The core is a prebuilt library (StellarCore.Build.cs): one built from an older or newer
+	// header than the app was would misread what crosses the boundary, so refuse it.
+	if (stc_abi_version() != STC_ABI_VERSION)
+	{
+		UE_LOG(LogStellarSpike, Error, TEXT("The core library has interface version %u, but the app was built for %u: rebuild the core (src/core/README.md)"),
+			stc_abi_version(), STC_ABI_VERSION);
+		FPlatformMisc::RequestExit(false, TEXT("StellarCore"));
+		return;
+	}
 	StarField = GetWorld()->SpawnActor<AStarField>();
 	AStarPointer* Pointer = GetWorld()->SpawnActor<AStarPointer>();
 	Pointer->SetStarField(StarField);

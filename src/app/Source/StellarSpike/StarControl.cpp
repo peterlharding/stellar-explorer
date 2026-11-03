@@ -199,11 +199,9 @@ bool AStarControl::Receive(FClient& Client)
 		}
 		Client.In.SetNum(Start + Read, EAllowShrinking::No);
 	}
-	if (Client.Socket->GetConnectionState() != SCS_Connected)
-	{
-		return false;
-	}
 
+	// What came before the console closed still counts: a command sent and the connection
+	// closed at once (echo ... | nc) is carried out, and only then is the console gone.
 	int32 LineEnd = INDEX_NONE;
 	while (Client.In.Find(static_cast<uint8>('\n'), LineEnd))
 	{
@@ -234,7 +232,7 @@ bool AStarControl::Receive(FClient& Client)
 			FPlatformMisc::RequestExit(false, TEXT("Console"));
 		}
 	}
-	return true;
+	return Client.Socket->GetConnectionState() == SCS_Connected;
 }
 
 bool AStarControl::Flush(FClient& Client)
@@ -287,7 +285,7 @@ TSharedRef<FJsonObject> AStarControl::State() const
 {
 	const TSharedRef<FJsonObject> Message = MakeShared<FJsonObject>();
 	Message->SetStringField(TEXT("type"), TEXT("state"));
-	Message->SetStringField(TEXT("build"), FString::Printf(TEXT("%s on %s, built %s"), STELLAR_SPIKE_COMMIT, STELLAR_SPIKE_BRANCH, STELLAR_SPIKE_BUILT));
+	Message->SetStringField(TEXT("build"), StellarBuild());
 	if (const APlayerController* Player = GetWorld()->GetFirstPlayerController(); Player != nullptr && Player->PlayerCameraManager != nullptr)
 	{
 		Message->SetArrayField(TEXT("position"), Icrs(Player->PlayerCameraManager->GetCameraLocation(), AStarField::UnitsPerParsec));

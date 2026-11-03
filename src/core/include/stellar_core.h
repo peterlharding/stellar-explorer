@@ -20,7 +20,7 @@ extern "C" {
 #endif
 
 /* ABI version of this library; a caller checks it matches this header. */
-#define STC_ABI_VERSION 3u
+#define STC_ABI_VERSION 4u
 uint32_t stc_abi_version(void);
 
 /* A position in parsecs, right-handed ICRS equatorial Cartesian. POD, by value. */
@@ -70,8 +70,17 @@ typedef struct StcStar
 	char spectral_type[STC_SPECTRAL_CAP]; /* NUL-terminated; empty when the catalogue has none */
 } StcStar;
 
-/* Open the catalogue at `path` read-only; returns NULL if it cannot be opened. */
+/* The catalogue schema this core reads: the pipeline's SCHEMA_VERSION, which it stores in
+ * each catalogue as SQLite's PRAGMA user_version. Changes only when the tables do. */
+#define STC_SCHEMA_VERSION 1
+
+/* Open the catalogue at `path` read-only; returns NULL if it cannot be opened, or if its
+ * schema is not STC_SCHEMA_VERSION (a catalogue built by an older or newer pipeline). */
 StcCatalogue* stc_catalogue_open(const char* path);
+
+/* The schema version of the catalogue at `path`, to say why stc_catalogue_open refused it;
+ * negative if the file cannot be read as a catalogue at all. */
+int32_t stc_catalogue_schema(const char* path);
 
 /* Close a catalogue opened by stc_catalogue_open. NULL is ignored. */
 void stc_catalogue_close(StcCatalogue* catalogue);

@@ -1170,7 +1170,7 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 													: TEXT("Move over a star")));
 	Title->SetTextRenderColor((HintColour * OverlayBrightness).ToFColor(false));
 	// With nothing to describe, the build, so a session can be matched to its code.
-	Details->SetText(FText::FromString(FString::Printf(TEXT("Build %s\n%s, %s"), STELLAR_SPIKE_COMMIT, STELLAR_SPIKE_BRANCH, STELLAR_SPIKE_BUILT)));
+	Details->SetText(FText::FromString(FString::Printf(TEXT("Version %s, build %s\n%s, %s"), *StellarVersion(), STELLAR_SPIKE_COMMIT, STELLAR_SPIKE_BRANCH, STELLAR_SPIKE_BUILT)));
 }
 
 void AStarPointer::ShowStar(int32 Star, const FLinearColor& Colour)

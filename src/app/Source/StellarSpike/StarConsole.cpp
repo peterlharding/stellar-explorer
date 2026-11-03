@@ -258,7 +258,7 @@ void AStarConsole::BuildPanel()
 							.Padding(12.0f)[Column]]];
 	GEngine->GameViewport->AddViewportWidgetContent(Panel.ToSharedRef(), 10);
 	const FString Role = IsRemote() ? FString::Printf(TEXT("Stellar Explorer: console for %s"), *Host) : FString(TEXT("Stellar Explorer"));
-	Title = FText::FromString(FString::Printf(TEXT("%s (build %s, %s)"), *Role, STELLAR_SPIKE_COMMIT, STELLAR_SPIKE_BRANCH));
+	Title = FText::FromString(FString::Printf(TEXT("%s %s (build %s, %s)"), *Role, *StellarVersion(), STELLAR_SPIKE_COMMIT, STELLAR_SPIKE_BRANCH));
 	FDesktopMouse::SetExcluded(Panel);
 }
 
@@ -550,7 +550,7 @@ void AStarConsole::ShowLocalState()
 		const FVector Head = Player->PlayerCameraManager->GetCameraLocation() / AStarField::UnitsPerParsec;
 		Position = FVector(Head.X, -Head.Y, Head.Z);
 	}
-	ShowState(FString::Printf(TEXT("%s on %s, built %s"), STELLAR_SPIKE_COMMIT, STELLAR_SPIKE_BRANCH, STELLAR_SPIKE_BUILT), Position,
+	ShowState(StellarBuild(), Position,
 		Name(StarField, Pointer->GetKept()), Name(StarField, Pointer->GetPointed()));
 }
 

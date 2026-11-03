@@ -30,7 +30,8 @@ How the documents relate: the design is in `ARCHITECTURE.md`, intentions and ope
 | --- | --- |
 | `docs/` | All documentation |
 | `src/pipeline/` | The Python ingest pipeline that builds the catalogue |
-| `src/` | Still to come: `src/core/` (C++ core library), `src/app/` (Godot project) |
+| `src/core/` | The C++ core library, behind a C ABI: catalogue access, astrometry, voice matching |
+| `src/app/` | The Unreal app, for the Mac, the Vision Pro and Windows with the Vive |
 | `scripts/` | Repository tooling: documentation link check, version fields |
 | `data/` | Downloaded catalogues and the built `catalogue.sqlite`; git-ignored |
 | `issues/` | Drafts of issues to report to other projects, such as errors found in source catalogues |

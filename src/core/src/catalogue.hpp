@@ -30,8 +30,11 @@ namespace stellar::core
 	class Catalogue
 	{
 	public:
-		// Open read-only; returns nullptr if the file cannot be opened.
+		// Open read-only; returns nullptr if the file cannot be opened or its schema is not
+		// STC_SCHEMA_VERSION.
 		static Catalogue* open(const char* path);
+		// The file's schema version (PRAGMA user_version); negative if it cannot be read.
+		static int32_t schema(const char* path);
 		~Catalogue();
 
 		Catalogue(const Catalogue&) = delete;

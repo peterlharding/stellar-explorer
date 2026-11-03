@@ -30,7 +30,7 @@ namespace
 		return std::fabs(a - b) <= tol;
 	}
 
-	bool write_fixture(const char* path, const std::string& long_name)
+	bool write_fixture(const char* path, const std::string& long_name, int schema = STC_SCHEMA_VERSION)
 	{
 		sqlite3* db = nullptr;
 		if (sqlite3_open(path, &db) != SQLITE_OK)
@@ -39,6 +39,7 @@ namespace
 			return false;
 		}
 		const std::string ddl =
+			"PRAGMA user_version = " + std::to_string(schema) + ";"
 			"CREATE TABLE object (id INTEGER PRIMARY KEY, kind TEXT, name TEXT);"
 			"CREATE TABLE measurement (object_id INTEGER, quantity TEXT, value REAL, preferred INTEGER);"
 			"CREATE TABLE property (object_id INTEGER, name TEXT, value TEXT, preferred INTEGER);"
@@ -75,6 +76,7 @@ int main()
 
 	StcCatalogue* cat = stc_catalogue_open(path);
 	check(cat != nullptr, "open fixture read-only");
+	check(stc_catalogue_schema(path) == STC_SCHEMA_VERSION, "the fixture's schema");
 	if (cat != nullptr)
 	{
 		check(stc_catalogue_star_count(cat) == 3, "three usable stars (the position-less one and the planet are filtered)");
@@ -126,6 +128,17 @@ int main()
 	stc_catalogue_close(nullptr); // a null handle is ignored
 
 	check(stc_catalogue_open("does_not_exist_12345.sqlite") == nullptr, "missing file -> null");
+	check(stc_catalogue_schema("does_not_exist_12345.sqlite") < 0, "missing file -> no schema");
+
+	// A catalogue built for another schema is refused, and its schema says why.
+	const char* other = "catalogue_other_schema.sqlite";
+	std::remove(other);
+	check(write_fixture(other, "Other", STC_SCHEMA_VERSION + 1), "write fixture of another schema");
+	check(stc_catalogue_schema(other) == STC_SCHEMA_VERSION + 1, "its schema is read");
+	StcCatalogue* refused = stc_catalogue_open(other);
+	check(refused == nullptr, "another schema -> null");
+	stc_catalogue_close(refused);
+	std::remove(other);
 
 	std::remove(path);
 	std::printf(g_failures ? "%d check(s) failed\n" : "all checks passed\n", g_failures);
