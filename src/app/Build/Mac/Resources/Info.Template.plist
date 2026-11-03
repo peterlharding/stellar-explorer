@@ -11,6 +11,12 @@
 	<false/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_stellar._tcp</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Stellar Explorer lets a desktop console on your network follow and steer it.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Stellar Explorer listens for spoken commands, such as "Go to Sirius".</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

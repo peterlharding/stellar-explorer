@@ -25,7 +25,8 @@ class FLogTap;
  *                     {"type": "log", "line": ...}     every log line, the last 500 on connecting;
  *                      a warning or an error says so after its category ("LogX: Warning: ...")
  *
- * Off with -NoControl, or ControlPort=0.
+ * On Apple platforms it is advertised by Bonjour as _stellar._tcp. Off with -NoControl, or
+ * ControlPort=0.
  */
 UCLASS(Config = Game)
 class AStarControl : public AActor
@@ -86,4 +87,6 @@ private:
 	TSharedPtr<FLogTap> LogTap;
 	double NextState = 0.0;
 	double LineUntil = 0.0;
+	/** The Bonjour registration (a DNSServiceRef), on Apple platforms; null elsewhere. */
+	void* Advertisement = nullptr;
 };
