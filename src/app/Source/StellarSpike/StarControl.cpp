@@ -217,7 +217,9 @@ bool AStarControl::Receive(FClient& Client)
 			UE_LOG(LogStarControl, Warning, TEXT("Console sent what is not a command: %s"), *Line.Left(200));
 			continue;
 		}
-		const FString Result = Actions->Run(Command);
+		// "quit": the console's "Quit the headset app" button, a clean exit as Quit is here.
+		const bool bQuit = Command.TrimStartAndEnd().Equals(TEXT("quit"), ESearchCase::IgnoreCase);
+		const FString Result = bQuit ? FString(TEXT("Quitting")) : Actions->Run(Command);
 		UE_LOG(LogStarControl, Display, TEXT("Console: \"%s\": %s"), *Command, *Result);
 		Pointer->SetVoiceLine(Result, false);
 		LineUntil = FPlatformTime::Seconds() + ResultSeconds;
@@ -226,6 +228,11 @@ bool AStarControl::Receive(FClient& Client)
 		Reply->SetStringField(TEXT("command"), Command);
 		Reply->SetStringField(TEXT("text"), Result);
 		Send(Client, Reply);
+		if (bQuit)
+		{
+			Flush(Client);
+			FPlatformMisc::RequestExit(false, TEXT("Console"));
+		}
 	}
 	return true;
 }

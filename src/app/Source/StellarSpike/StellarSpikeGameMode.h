@@ -16,7 +16,7 @@ class AStarField;
  *   -TestObject         put a lit cube 1 m in front of a headset's start, to tell
  *                       "nothing renders" from "the stars do not show"
  *   -Console=<host>[:<port>]  be a console for the app on that host (AStarConsole)
- *   -SkySphere[=<pc>]   enclose the view in an opaque black sphere, by default
+ *   -SkySphere[=<pc>]   enclose the view in an opaque black sphere about the head, by default
  *                       beyond the furthest star; always done in a headset
  *                       (see SpawnSkySphere)
  */
@@ -27,6 +27,13 @@ class AStellarSpikeGameMode : public AGameModeBase
 
 public:
 	AStellarSpikeGameMode();
+
+	/**
+	 * The viewer stays within this of the Sun: the catalogue's edge, from where it is still a
+	 * cloud of stars. Each "back off" triples the distance, and a few took the viewer thousands
+	 * of parsecs out, where the whole catalogue was a faint smudge.
+	 */
+	static constexpr double MaxReachParsecs = 1500.0;
 
 	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 	virtual void StartPlay() override;
@@ -46,6 +53,11 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<AStarField> StarField;
+
+	/** The sky sphere, when there is one: kept centred on the head. */
+	UPROPERTY()
+	TObjectPtr<AActor> SkySphere;
+
 
 	bool bAutopilot = false;
 	TOptional<FVector> LookAt;
