@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-04
+
+See [release_notes/v0.1.0.md](release_notes/v0.1.0.md) for details.
+
 ### Added
 
 - Architecture document, plan and ADR convention under `docs/`.
@@ -33,4 +37,5 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 - The control service carries out a command sent just before the console closes its connection, such as a `quit` piped through `nc`.
 
-[Unreleased]: https://github.com/peterlharding/stellar-explorer/commits/main
+[Unreleased]: https://github.com/peterlharding/stellar-explorer/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.1.0
