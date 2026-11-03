@@ -60,6 +60,11 @@ extern "C"
 		return reinterpret_cast<StcCatalogue*>(stellar::core::Catalogue::open(path));
 	}
 
+	int32_t stc_catalogue_schema(const char* path)
+	{
+		return stellar::core::Catalogue::schema(path);
+	}
+
 	void stc_catalogue_close(StcCatalogue* catalogue)
 	{
 		delete as_core(catalogue); // delete nullptr is a no-op

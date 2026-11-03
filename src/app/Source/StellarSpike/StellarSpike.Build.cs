@@ -7,6 +7,8 @@ public class StellarSpike : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 		bWarningsAsErrors = true;
 		PublicDependencyModuleNames.AddRange(new[] { "Core", "CoreUObject", "Engine", "ProceduralMeshComponent", "HeadMountedDisplay", "InputCore" });
+		// The release version, ProjectVersion in the project settings (BuildStamp.h).
+		PrivateDependencyModuleNames.Add("EngineSettings");
 		// Catalogue access and astrometry come from the engine-independent core (ADR 0014),
 		// not the engine's SQLite plugin.
 		PrivateDependencyModuleNames.Add("StellarCore");
