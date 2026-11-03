@@ -29,6 +29,7 @@
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SWrapBox.h"
 #include "Widgets/SBoxPanel.h"
+#include "Widgets/SWindow.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Views/SListView.h"
 #include "Widgets/Views/STableRow.h"
@@ -38,6 +39,8 @@ DEFINE_LOG_CATEGORY_STATIC(LogStarConsole, Log, All);
 namespace
 {
 	constexpr double RetrySeconds = 2.0;
+	/** Why Receive disconnects when the other app closes its end. */
+	const TCHAR* const ClosedByApp = TEXT("the other app closed the connection");
 	constexpr double StateSeconds = 0.2;
 	/** Lines of the log kept in the panel. */
 	constexpr int32 MaxLogLines = 5000;
@@ -182,7 +185,7 @@ void AStarConsole::BuildPanel()
 				.Text(FText::FromString(IsRemote() ? FString::Printf(TEXT("Console: steering %s"), *Host) : TEXT("Console: this app")))
 				.Font(FCoreStyle::GetDefaultFontStyle("Bold", 12))];
 	Column->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 4.0f)
-		[SAssignNew(StatusText, STextBlock).Text(FText::FromString(IsRemote() ? TEXT("Connecting...") : TEXT("Tab hides this panel")))];
+		[SAssignNew(StatusText, STextBlock).AutoWrapText(true).Text(FText::FromString(IsRemote() ? TEXT("Connecting...") : TEXT("Tab hides this panel")))];
 	Column->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)[SAssignNew(StateText, STextBlock).AutoWrapText(true)];
 	Column->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 6.0f)
 		[SNew(SEditableTextBox)
@@ -225,12 +228,25 @@ void AStarConsole::BuildPanel()
 				.OnGenerateRow_Lambda([Weak](TSharedPtr<FString> Line, const TSharedRef<STableViewBase>& Owner) -> TSharedRef<ITableRow> {
 					return Weak.IsValid() ? Weak->MakeLogRow(Line, Owner) : SNew(STableRow<TSharedPtr<FString>>, Owner);
 				})];
-	// Quit this app as a menu or Command-Q would, so it shuts down cleanly.
-	Column->AddSlot().AutoHeight().HAlign(HAlign_Right)
-		[SNew(SButton).Text(FText::FromString(TEXT("Quit"))).OnClicked_Lambda([]() {
-			FPlatformMisc::RequestExit(false, TEXT("Console"));
-			return FReply::Handled();
-		})];
+	// Quit this app as a menu or Command-Q would, so it shuts down cleanly; steering another,
+	// that one too, by the control service's "quit".
+	TSharedRef<SHorizontalBox> QuitRow = SNew(SHorizontalBox);
+	if (IsRemote())
+	{
+		QuitRow->AddSlot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)
+			[SNew(SButton).Text(FText::FromString(TEXT("Quit the headset app"))).OnClicked_Lambda([Weak]() {
+				if (Weak.IsValid())
+				{
+					Weak->SendCommand(TEXT("quit"));
+				}
+				return FReply::Handled();
+			})];
+	}
+	QuitRow->AddSlot().AutoWidth()[SNew(SButton).Text(FText::FromString(TEXT("Quit"))).OnClicked_Lambda([]() {
+		FPlatformMisc::RequestExit(false, TEXT("Console"));
+		return FReply::Handled();
+	})];
+	Column->AddSlot().AutoHeight().HAlign(HAlign_Right)[QuitRow];
 
 	// The panel down the left; the rest of the window is the view, which the box lets clicks through to.
 	Panel = SNew(SHorizontalBox).Visibility(EVisibility::SelfHitTestInvisible)
@@ -241,6 +257,8 @@ void AStarConsole::BuildPanel()
 							.BorderBackgroundColor(PanelColour)
 							.Padding(12.0f)[Column]]];
 	GEngine->GameViewport->AddViewportWidgetContent(Panel.ToSharedRef(), 10);
+	const FString Role = IsRemote() ? FString::Printf(TEXT("Stellar Explorer: console for %s"), *Host) : FString(TEXT("Stellar Explorer"));
+	Title = FText::FromString(FString::Printf(TEXT("%s (build %s, %s)"), *Role, STELLAR_SPIKE_COMMIT, STELLAR_SPIKE_BRANCH));
 	FDesktopMouse::SetExcluded(Panel);
 }
 
@@ -254,6 +272,16 @@ void AStarConsole::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	const double Now = FPlatformTime::Seconds();
+
+	// The window says what it is, in place of the engine's "StellarSpike (64-bit Development
+	// ...)". Set as it differs: the engine sets its own after the panel is built.
+	if (GEngine->GameViewport != nullptr)
+	{
+		if (const TSharedPtr<SWindow> Window = GEngine->GameViewport->GetWindow(); Window.IsValid() && !Window->GetTitle().EqualTo(Title))
+		{
+			Window->SetTitle(Title);
+		}
+	}
 
 	// Tab shows and hides the panel (not while typing in it, where Slate has the key).
 	if (const APlayerController* Player = GetWorld()->GetFirstPlayerController(); Player != nullptr && Panel.IsValid())
@@ -293,11 +321,17 @@ void AStarConsole::Tick(float DeltaSeconds)
 				ShownLines.Reset();
 				bLogChanged = true;
 				bAnswered = false;
-				StatusText->SetText(FText::FromString(FString::Printf(TEXT("Waiting for an answer from %s:%d..."), *Host, Port)));
+				if (Lost.IsEmpty())
+				{
+					StatusText->SetText(FText::FromString(FString::Printf(TEXT("Waiting for an answer from %s:%d..."), *Host, Port)));
+				}
 			}
 			else
 			{
-				StatusText->SetText(FText::FromString(FString::Printf(TEXT("Cannot reach %s:%d; retrying"), *Host, Port)));
+				if (Lost.IsEmpty())
+				{
+					StatusText->SetText(FText::FromString(FString::Printf(TEXT("Cannot reach %s:%d; retrying"), *Host, Port)));
+				}
 				NextAttempt = Now + RetrySeconds;
 			}
 		}
@@ -331,7 +365,10 @@ void AStarConsole::Tick(float DeltaSeconds)
 
 void AStarConsole::Connect()
 {
-	StatusText->SetText(FText::FromString(FString::Printf(TEXT("Connecting to %s:%d..."), *Host, Port)));
+	if (Lost.IsEmpty())
+	{
+		StatusText->SetText(FText::FromString(FString::Printf(TEXT("Connecting to %s:%d..."), *Host, Port)));
+	}
 	// Name lookup and connecting block: off the game thread.
 	Connecting = Async(EAsyncExecution::Thread, [Host = Host, Port = Port]() -> FSocket* {
 		ISocketSubsystem* Sockets = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
@@ -369,9 +406,24 @@ void AStarConsole::Disconnect(const FString& Why)
 	Socket = nullptr;
 	NextAttempt = FPlatformTime::Seconds() + RetrySeconds;
 	UE_LOG(LogStarConsole, Display, TEXT("Disconnected from %s:%d: %s"), *Host, Port, *Why);
+	// Said as what happened, and kept while the console waits for the app to start again.
+	if (bQuitSent)
+	{
+		Lost = TEXT("The headset app has quit. Waiting for it to start again.");
+	}
+	else if (bAnswered && Why == ClosedByApp)
+	{
+		Lost = TEXT("The headset app has closed (quit, or the headset was taken off). Waiting for it to start again.");
+	}
+	else
+	{
+		Lost = FString::Printf(TEXT("Lost the connection to %s (%s). Trying again."), *Host, *Why);
+	}
+	bQuitSent = false;
+	bAnswered = false;
 	if (StatusText.IsValid())
 	{
-		StatusText->SetText(FText::FromString(FString::Printf(TEXT("Disconnected from %s:%d (%s); retrying"), *Host, Port, *Why)));
+		StatusText->SetText(FText::FromString(Lost));
 	}
 }
 
@@ -392,7 +444,7 @@ void AStarConsole::Receive()
 	}
 	if (Socket->GetConnectionState() != SCS_Connected)
 	{
-		Disconnect(TEXT("the other app closed the connection"));
+		Disconnect(ClosedByApp);
 		return;
 	}
 	int32 LineEnd = INDEX_NONE;
@@ -401,6 +453,7 @@ void AStarConsole::Receive()
 		if (!bAnswered)
 		{
 			bAnswered = true;
+			Lost.Reset();
 			UE_LOG(LogStarConsole, Display, TEXT("Connected to %s:%d"), *Host, Port);
 			StatusText->SetText(FText::FromString(FString::Printf(TEXT("Connected to %s:%d. Tab hides this panel"), *Host, Port)));
 		}
@@ -449,7 +502,7 @@ void AStarConsole::SendCommand(const FString& Command)
 	}
 	if (Socket == nullptr || !bAnswered)
 	{
-		ShowResult(Command, FString::Printf(TEXT("not connected to %s"), *Host));
+		ShowResult(Command, Lost.IsEmpty() ? FString::Printf(TEXT("not connected to %s yet"), *Host) : Lost);
 		return;
 	}
 	const TSharedRef<FJsonObject> Message = MakeShared<FJsonObject>();
@@ -465,6 +518,7 @@ void AStarConsole::SendCommand(const FString& Command)
 		Disconnect(TEXT("sending failed"));
 		return;
 	}
+	bQuitSent = Command.Equals(TEXT("quit"), ESearchCase::IgnoreCase);
 	ShowResult(Command, TEXT("sent..."));
 }
 

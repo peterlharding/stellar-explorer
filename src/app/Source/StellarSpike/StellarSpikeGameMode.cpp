@@ -128,8 +128,11 @@ void AStellarSpikeGameMode::SpawnSkySphere()
 		UE_LOG(LogStellarSpike, Error, TEXT("Sky sphere: /Engine/BasicShapes/BasicShapeMaterial is not in the package"));
 		return;
 	}
-	// By default beyond the furthest star, about 1,000 pc. Nothing lights it, so it is black.
-	double RadiusParsecs = 1200.0;
+	// Centred on the head and moved with it (Tick), and larger than the furthest star (8,500 pc)
+	// is from anywhere the viewer can go (MaxReachParsecs from the Sun): it stays behind every
+	// star. Centred on the Sun and 1,200 pc across, it was overtaken by backing off from a star
+	// far out, and from outside it hid the whole sky. Nothing lights it, so it is black.
+	double RadiusParsecs = 20000.0;
 	FParse::Value(FCommandLine::Get(), TEXT("SkySphere="), RadiusParsecs);
 	const double Radius = RadiusParsecs * AStarField::UnitsPerParsec;
 
@@ -158,6 +161,7 @@ void AStellarSpikeGameMode::SpawnSkySphere()
 		}
 	}
 	AActor* Sky = GetWorld()->SpawnActor<AActor>();
+	SkySphere = Sky;
 	UProceduralMeshComponent* Mesh = NewObject<UProceduralMeshComponent>(Sky, TEXT("SkySphere"));
 	Sky->SetRootComponent(Mesh);
 	Mesh->RegisterComponent();
@@ -226,6 +230,22 @@ void AStellarSpikeGameMode::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	Elapsed += DeltaSeconds;
+
+	// No further from the Sun than MaxReachParsecs, beyond every star, whatever moved the viewer;
+	// and the sky sphere about the head.
+	if (APlayerController* Viewer = GetWorld()->GetFirstPlayerController(); Viewer != nullptr && Viewer->GetPawn() != nullptr)
+	{
+		APawn* Pawn = Viewer->GetPawn();
+		const double MaxReach = MaxReachParsecs * AStarField::UnitsPerParsec;
+		if (Pawn->GetActorLocation().Size() > MaxReach)
+		{
+			Pawn->SetActorLocation(Pawn->GetActorLocation().GetSafeNormal() * MaxReach);
+		}
+		if (SkySphere != nullptr && Viewer->PlayerCameraManager != nullptr)
+		{
+			SkySphere->SetActorLocation(Viewer->PlayerCameraManager->GetCameraLocation());
+		}
+	}
 	// Ignore the first seconds, while shaders compile and the catalogue loads.
 	if (Elapsed > 3.0)
 	{

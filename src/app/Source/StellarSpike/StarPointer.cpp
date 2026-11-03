@@ -115,6 +115,8 @@ namespace
 		return MenuTop - MenuPadding - (Item + 0.5) * ItemHeight;
 	}
 	constexpr double LightYearsPerParsec = 3.26156;
+	/** The size of a dot hidden beyond the panel: too small to see, never zero. */
+	constexpr double HiddenDot = 1e-3;
 	/** The ring under the cursor comes back this long after the view last moved. */
 	constexpr double HoverAfterMoveSeconds = 0.5;
 	/** How far the view turns as the mouse drags one pixel. */
@@ -757,7 +759,11 @@ void AStarPointer::Tick(float DeltaSeconds)
 			for (int32 Dot = 0; Dot < DotCount; ++Dot)
 			{
 				const double Distance = FirstDot * FMath::Pow(LastDot / FirstDot, double(Dot) / (DotCount - 1));
-				const double Diameter = Distance <= Reach ? FMath::Max(SmallestDot, Distance * DotAngularDiameter) : 0.0;
+				// Beyond the panel a dot is hidden by shrinking it, never to nothing: a zero scale
+				// cannot be inverted, and one such instance hid every dot of the ray. The slack lets
+				// the last dot of an ordinary ray, which rounding puts a hair past LastDot, show.
+				const bool bShown = Distance <= Reach * (1.0 + 1e-6);
+				const double Diameter = bShown ? FMath::Max(SmallestDot, Distance * DotAngularDiameter) : HiddenDot;
 				// The basic sphere is 100 units across.
 				Dots->UpdateInstanceTransform(Dot, FTransform(FQuat::Identity, Ray.Origin + Ray.Direction * Distance, FVector(Diameter / 100.0)),
 					true, Dot == DotCount - 1, true);
@@ -1151,7 +1157,7 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 		return;
 	}
 	Hint->SetText(FText::FromString(!bPointingStarted ? (bUsingControllers ? TEXT("Then pull the trigger again to keep a star") : TEXT("Then pinch again to keep a star"))
-			: !bHeadset                             ? TEXT("Click to keep a star; middle-drag to look round")
+			: !bHeadset                             ? TEXT("Click a star to keep it; drag to look")
 			: bUsingControllers                     ? TEXT("Pull the trigger to keep a star, both to exit")
 													: TEXT("Pinch to keep a star, both hands to exit")));
 	if (Hovered != INDEX_NONE)

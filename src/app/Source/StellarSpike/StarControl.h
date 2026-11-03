@@ -16,7 +16,8 @@ class FLogTap;
  * The control service: what the desktop console (F10 in the direction notes) talks to. It
  * listens on ControlPort and exchanges one JSON object per line with each console connected:
  *
- *   from the console  {"command": "go to Sirius"}     run through AStarActions, as if spoken
+ *   from the console  {"command": "go to Sirius"}     run through AStarActions, as if spoken;
+ *                     {"command": "quit"}             quits this app, cleanly
  *   to the console    {"type": "result", "command": ..., "text": ...}
  *                     {"type": "state", "position": [x, y, z], "facing": [x, y, z], "up": [x, y, z],
  *                      "kept": ..., "kept_position": [x, y, z], "pointed": ..., "build": ...}

@@ -30,7 +30,8 @@ class SListView;
  *
  * Either way the panel shows the state (build, position, the star kept and the one pointed
  * at), a command box (typed, so never misheard), buttons for the commands that need no name,
- * the log (warnings amber, errors red, with a filter), and Quit.
+ * the log (warnings amber, errors red, with a filter), and Quit; steering another app, also
+ * "Quit the headset app", which quits that one.
  */
 UCLASS()
 class AStarConsole : public AActor
@@ -89,8 +90,14 @@ private:
 	double NextAttempt = 0.0;
 	/** The other app has answered on this connection: "connected" means that, not just accepted. */
 	bool bAnswered = false;
+	/** "quit" was the last command sent: the app closing next is its doing, not a fault. */
+	bool bQuitSent = false;
+	/** Since the connection was lost, what the panel says happened; empty before, and once back. */
+	FString Lost;
 	TArray<uint8> In;
 
+	/** The window's title: what this app is, and its build. */
+	FText Title;
 	TSharedPtr<SWidget> Panel;
 	bool bPanelShown = true;
 	bool bTabWasDown = false;

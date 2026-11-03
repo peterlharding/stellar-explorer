@@ -8,12 +8,22 @@
 #include "GameFramework/PawnMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "StarField.h"
+#include "StellarSpikeGameMode.h"
 #include "StarPointer.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogStarActions, Log, All);
 
 namespace
 {
+	/** How far from From along Direction (a unit vector) stays within Reach of the Sun (the origin). */
+	double FurthestAlong(const FVector& From, const FVector& Direction, double Reach)
+	{
+		// |From + t Direction| = Reach, the larger root.
+		const double B = FVector::DotProduct(From, Direction);
+		const double C = From.SizeSquared() - Reach * Reach;
+		return FMath::Max(0.0, -B + FMath::Sqrt(FMath::Max(0.0, B * B - C)));
+	}
+
 	/**
 	 * "Closer" stops this far from a star, twice the camera's near plane (NearClipPlane in
 	 * DefaultEngine.ini, 0.01 pc), nearer than which it is not drawn.
@@ -144,15 +154,20 @@ FString AStarActions::Perform(const StcVoiceCommand& Command, const FString& Hea
 		}
 		const FVector Position = StarField->GetPosition(Star);
 		const FVector Away = Head - Position;
-		const double Parsecs = FMath::Max(Away.Size() / AStarField::UnitsPerParsec * (bBack ? DistanceFactor : 1.0 / DistanceFactor), NearestParsecs);
-		const FVector Target = Position + Away.GetSafeNormal() * Parsecs * AStarField::UnitsPerParsec;
+		double Parsecs = FMath::Max(Away.Size() / AStarField::UnitsPerParsec * (bBack ? DistanceFactor : 1.0 / DistanceFactor), NearestParsecs);
+		// No further out than the game mode lets the viewer go: the catalogue's edge.
+		const FVector Direction = Away.GetSafeNormal();
+		const double Edge = FurthestAlong(Position, Direction, AStellarSpikeGameMode::MaxReachParsecs * AStarField::UnitsPerParsec) / AStarField::UnitsPerParsec;
+		const bool bAtEdge = bBack && Parsecs >= Edge;
+		Parsecs = FMath::Min(Parsecs, Edge);
+		const FVector Target = Position + Direction * Parsecs * AStarField::UnitsPerParsec;
 		MoveHeadTo(Target);
 		Face(Star, Target);
 		// Two decimals near a star, where "closer" goes as far as 0.02 pc; fewer further out.
 		const FString Distance = Parsecs < 1.0	  ? FString::Printf(TEXT("%.2f"), Parsecs)
 							   : Parsecs < 10.0 ? FString::Printf(TEXT("%.1f"), Parsecs)
 												: FString::Printf(TEXT("%.0f"), Parsecs);
-		return FString::Printf(TEXT("%s pc from %s"), *Distance, *StarField->GetName(Star));
+		return FString::Printf(TEXT("%s pc from %s%s"), *Distance, *StarField->GetName(Star), bAtEdge ? TEXT(": the catalogue's edge") : TEXT(""));
 	}
 	case STC_VOICE_ALIGN_GALACTIC:
 	case STC_VOICE_ALIGN_CELESTIAL:
