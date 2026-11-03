@@ -21,6 +21,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - A desktop console in the app's window: the state, a command box, buttons, the log, Blender-style mouse navigation, and steering a headset's app over the local network, found by Bonjour.
 - On the headset, the panel can be carried by a grab bar, and has an actions list for travel without speaking.
 - The release version is shown beside the build stamp in the log, the window title, the console and the headset's panel, and set on the Mac and visionOS app bundles.
+- `scripts/make_macos.sh`, with `build_macos` and `build_visionos` shell functions that build the core libraries for the Mac and visionOS, and notes on building and running the app on a Mac.
 - The core refuses a catalogue built for another schema, and the app says which schema it found; `make version-check` fails if the pipeline and the core disagree on the schema.
 - The app quits with an error when the prebuilt core library was built for another interface version than the app.
 
