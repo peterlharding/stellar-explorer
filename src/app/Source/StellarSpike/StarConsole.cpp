@@ -335,8 +335,12 @@ void AStarConsole::Connect()
 	// Name lookup and connecting block: off the game thread.
 	Connecting = Async(EAsyncExecution::Thread, [Host = Host, Port = Port]() -> FSocket* {
 		ISocketSubsystem* Sockets = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
-		const FAddressInfoResult Found = Sockets->GetAddressInfo(*Host, nullptr, EAddressInfoFlags::Default, NAME_None, ESocketType::SOCKTYPE_Streaming);
-		for (const FAddressInfoResultData& Result : Found.Results)
+		// IPv4 first: the control service listens on IPv4, and asked for any address the
+		// Mac's resolver gave only IPv6 link-local ones for a headset's .local name.
+		TArray<FAddressInfoResultData> Results =
+			Sockets->GetAddressInfo(*Host, nullptr, EAddressInfoFlags::Default, FNetworkProtocolTypes::IPv4, ESocketType::SOCKTYPE_Streaming).Results;
+		Results.Append(Sockets->GetAddressInfo(*Host, nullptr, EAddressInfoFlags::Default, NAME_None, ESocketType::SOCKTYPE_Streaming).Results);
+		for (const FAddressInfoResultData& Result : Results)
 		{
 			TSharedRef<FInternetAddr> Address = Result.Address->Clone();
 			Address->SetPort(Port);

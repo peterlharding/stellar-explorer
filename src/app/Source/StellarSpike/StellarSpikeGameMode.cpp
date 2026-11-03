@@ -72,6 +72,7 @@ void AStellarSpikeGameMode::StartPlay()
 	Pointer->SetStarField(StarField);
 	AStarActions* Actions = GetWorld()->SpawnActor<AStarActions>();
 	Actions->Setup(StarField, Pointer);
+	Pointer->SetActions(Actions);
 	// On the desktop the console panel steers this app, or with -Console=host another; an app
 	// that is not steering another listens, and can be steered.
 	FString ConsoleTarget;

@@ -18,6 +18,10 @@
 #include "StarField.h"
 #include "StarPointer.h"
 
+#if PLATFORM_APPLE
+#include <dns_sd.h>
+#endif
+
 DEFINE_LOG_CATEGORY_STATIC(LogStarControl, Log, All);
 
 namespace
@@ -73,10 +77,36 @@ void AStarControl::BeginPlay()
 		return;
 	}
 	UE_LOG(LogStarControl, Display, TEXT("Control service listening on port %d"), ControlPort);
+
+#if PLATFORM_APPLE
+	// Advertised by Bonjour as _stellar._tcp, under the device's name, so a console can find
+	// it; and on visionOS, so the system asks for local network access at launch. Only
+	// listening, the app was never asked, and what it sent on accepted connections was
+	// silently held back (Settings did not even list it under Local Network).
+	DNSServiceRef Service = nullptr;
+	const DNSServiceErrorType Error = DNSServiceRegister(&Service, 0, 0, nullptr, "_stellar._tcp", nullptr, nullptr,
+		htons(static_cast<uint16>(ControlPort)), 0, nullptr, nullptr, nullptr);
+	if (Error == kDNSServiceErr_NoError)
+	{
+		Advertisement = Service;
+		UE_LOG(LogStarControl, Display, TEXT("Control service advertised by Bonjour as _stellar._tcp"));
+	}
+	else
+	{
+		UE_LOG(LogStarControl, Warning, TEXT("Control service not advertised by Bonjour: error %d"), static_cast<int32>(Error));
+	}
+#endif
 }
 
 void AStarControl::EndPlay(const EEndPlayReason::Type Reason)
 {
+#if PLATFORM_APPLE
+	if (Advertisement != nullptr)
+	{
+		DNSServiceRefDeallocate(static_cast<DNSServiceRef>(Advertisement));
+		Advertisement = nullptr;
+	}
+#endif
 	Listener.Reset();
 	for (FClient& Client : Clients)
 	{

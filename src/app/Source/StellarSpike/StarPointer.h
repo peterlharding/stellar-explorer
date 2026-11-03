@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "StarPointer.generated.h"
 
+class AStarActions;
 class AStarField;
 class FDesktopMouse;
 class UInstancedStaticMeshComponent;
@@ -21,7 +22,12 @@ class UTextRenderComponent;
  * aim and the trigger selects. The other hand (or controller) is tracked only for the gesture that
  * quits. On the desktop the ray runs under the cursor and the mouse works as in Blender, the
  * star kept the pivot: a click keeps the star under it (on empty sky, lets go), middle-drag
- * orbits, Shift + middle-drag pans, the wheel zooms, "." or F faces it (FDesktopMouse). The star pointed at is ringed and described
+ * orbits, Shift + middle-drag pans, the wheel zooms, "." or F faces it (FDesktopMouse).
+ *
+ * In a headset the panel has a grab bar below it (pinch it and move to carry the panel to
+ * another place in the view) and a "..." button above it that opens a list of the commands
+ * needing no star's name (Go there, Back off, ...). The ray shows whenever it points at them,
+ * even with a star kept. -PanelControls shows them on the desktop too, to check the layout. The star pointed at is ringed and described
  * in a panel at the bottom right of the view, which follows the head. In a headset the ray
  * is off at start, and a first pinch turns it on. A pinch then keeps the
  * star: it is ringed in another colour, the panel stays on it, and the ray goes until two
@@ -38,6 +44,9 @@ public:
 	AStarPointer();
 
 	void SetStarField(AStarField* InStarField) { StarField = InStarField; }
+
+	/** What the panel's actions list runs its commands through. */
+	void SetActions(AStarActions* InActions) { Actions = InActions; }
 
 	/** Keep a star as a pinch would, or with INDEX_NONE let the kept one go: for spoken commands. */
 	void Keep(int32 Star);
@@ -99,6 +108,9 @@ private:
 		double Time;
 		int32 Star;
 		double Gap;
+		/** The part of the panel the ray met (PartNone if none), and how far along the ray. */
+		int32 Part;
+		double Along;
 	};
 
 	struct FHand
@@ -136,6 +148,12 @@ private:
 	void UseMouse(const FVector& Head, const FRotator& HeadRotation);
 	void PlaceRing(UProceduralMeshComponent* Ring, int32 Star, const FVector& Head) const;
 	void PlacePanel(const FVector& Head, const FRotator& HeadRotation, float DeltaSeconds);
+	/** The part of the panel, its grab bar, its actions button or its list a ray meets, and how far along it. */
+	int32 HitPanel(const FVector& Origin, const FVector& Direction, double& Along) const;
+	/** A pinch on a part of the panel: grab it, open or close the list, or run an item. */
+	void PressPanel(int32 Part, const FVector& Origin, const FVector& Direction, double Along);
+	/** Show a line above the panel for a while, as voice and the console do. */
+	void ShowNote(const FString& Text);
 	void ShowStar(int32 Star, const FLinearColor& Colour);
 	UMaterialInstanceDynamic* ColouredMaterial(const FLinearColor& Colour);
 
@@ -200,6 +218,30 @@ private:
 	UPROPERTY()
 	TObjectPtr<UTextRenderComponent> VoiceLine;
 
+	/** The pill under the panel: pinch it and move to carry the panel, as a visionOS window's bar. */
+	UPROPERTY()
+	TObjectPtr<UProceduralMeshComponent> GrabBar;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> GrabBarMaterial;
+
+	/** The "..." button above the panel's right end, which opens the actions list. */
+	UPROPERTY()
+	TObjectPtr<UProceduralMeshComponent> ActionsFrame;
+
+	UPROPERTY()
+	TObjectPtr<UTextRenderComponent> ActionsText;
+
+	/** The actions list, to the panel's left: the commands that need no star's name. */
+	UPROPERTY()
+	TObjectPtr<UProceduralMeshComponent> MenuFrame;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UTextRenderComponent>> MenuItems;
+
+	UPROPERTY()
+	TObjectPtr<AStarActions> Actions;
+
 	struct FViewMove
 	{
 		FVector2D Turn = FVector2D::ZeroVector;
@@ -231,6 +273,18 @@ private:
 	bool bPointingStarted = false;
 	/** The panel's rotation, which follows the head's a little behind. */
 	FQuat PanelRotation = FQuat::Identity;
+	/** Where the panel's centre is, in the head's frame (forward, right, up): moved by its bar. */
+	FVector PanelPlace = FVector(100.0, 22.0, -21.0);
+	/** The part of the panel the pointing ray meets this frame, or PartNone. */
+	int32 Aimed = 0;
+	double AimedAlong = 0.0;
+	bool bMenuOpen = false;
+	/** Carrying the panel by its bar: how far along the ray it was grabbed, and from the panel's centre. */
+	bool bCarrying = false;
+	double CarryAlong = 0.0;
+	FVector CarryGrip = FVector::ZeroVector;
+	/** When a line shown by ShowNote is to go. */
+	double NoteUntil = 0.0;
 	bool bPanelPlaced = false;
 	double BothPinchedSeconds = 0.0;
 	bool bHeadset = false;
@@ -244,5 +298,6 @@ private:
 	int32 LoggedInputMode = -1;
 
 	static constexpr double MaxPointingAngleDegrees = 2.0;
-	static constexpr double HoldToExitSeconds = 2.0;
+	/** Long enough not to happen by accident: at 2 s a pinch on a system prompt, the other hand resting, quit. */
+	static constexpr double HoldToExitSeconds = 4.0;
 };
