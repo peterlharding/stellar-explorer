@@ -18,6 +18,7 @@
 #include "Misc/CommandLine.h"
 #include "MotionControllerComponent.h"
 #include "ProceduralMeshComponent.h"
+#include "StarActions.h"
 #include "StarField.h"
 #include "StarViewerPawn.h"
 
@@ -64,9 +65,8 @@ namespace
 	constexpr float TriggerRelease = 0.4f;
 	// Angular radius of the rings around a star.
 	constexpr double RingDegrees = 0.7;
-	// The panel: its centre's place in front of the head (forward, right, up), its size,
-	// the text heights, and how long it takes to follow the head's turns.
-	const FVector PanelOffset(100.0, 22.0, -21.0);
+	// The panel: its size, the text heights, and how long it takes to follow the head's
+	// turns. Its place in front of the head is AStarPointer::PanelPlace, which its bar moves.
 	constexpr double PanelWidth = 25.0;
 	constexpr double PanelHeight = 12.0;
 	constexpr double PanelPadding = 1.6;
@@ -76,6 +76,44 @@ namespace
 	constexpr float DetailsSize = 1.8f;
 	constexpr float HintSize = 1.4f;
 	constexpr double PanelFollowSeconds = 0.12;
+	// The parts of the panel a ray can meet (AStarPointer::HitPanel).
+	constexpr int32 PartNone = 0;
+	constexpr int32 PartBody = 1;
+	constexpr int32 PartBar = 2;
+	constexpr int32 PartActions = 3;
+	/** The first item of the actions list; the others follow. */
+	constexpr int32 PartItem = 10;
+	// The grab bar under the panel, the "..." button above its right end, and the actions list
+	// to its left, in the panel's units; and how far outside each a ray still counts.
+	constexpr double BarWidth = 7.0;
+	constexpr double BarHeight = 0.7;
+	constexpr double BarGap = 1.2;
+	constexpr double ButtonWidth = 3.6;
+	constexpr double ButtonHeight = 2.4;
+	constexpr double ButtonGap = 0.8;
+	constexpr double MenuWidth = 15.0;
+	constexpr double ItemHeight = 2.6;
+	constexpr double MenuGap = 1.2;
+	constexpr double MenuPadding = 0.8;
+	constexpr double HitMargin = 0.6;
+	/** After a pinch on the panel, this long before the next: a pinch seen twice must not toggle twice. */
+	constexpr double PanelGateSeconds = 0.4;
+	/** How long a line shown by ShowNote stays. */
+	constexpr double NoteSeconds = 6.0;
+	/** The actions list: the commands that need no star's name, run through AStarActions. */
+	const TCHAR* const MenuLabels[] = {TEXT("Go there"), TEXT("Back off"), TEXT("Closer"), TEXT("Return to the Sun"), TEXT("Let go")};
+	constexpr int32 MenuCount = UE_ARRAY_COUNT(MenuLabels);
+	constexpr double MenuHeight = MenuCount * ItemHeight + 2.0 * MenuPadding;
+	// Where they sit on the panel (right, up from its centre).
+	constexpr double BarUp = -PanelHeight / 2.0 - BarGap - BarHeight / 2.0;
+	constexpr double ButtonRight = PanelWidth / 2.0 - ButtonWidth / 2.0;
+	constexpr double ButtonUp = PanelHeight / 2.0 + ButtonGap + ButtonHeight / 2.0;
+	constexpr double MenuRight = -PanelWidth / 2.0 - MenuGap - MenuWidth / 2.0;
+	constexpr double MenuTop = PanelHeight / 2.0;
+	constexpr double ItemUp(int32 Item)
+	{
+		return MenuTop - MenuPadding - (Item + 0.5) * ItemHeight;
+	}
 	constexpr double LightYearsPerParsec = 3.26156;
 	/** The ring under the cursor comes back this long after the view last moved. */
 	constexpr double HoverAfterMoveSeconds = 0.5;
@@ -104,6 +142,7 @@ namespace
 	const FLinearColor SelectionColour(1.0f, 0.7f, 0.25f);
 	const FLinearColor DetailsColour(0.65f, 0.7f, 0.75f);
 	const FLinearColor HintColour(0.5f, 0.55f, 0.6f);
+	const FLinearColor BarColour(0.4f, 0.45f, 0.5f);
 
 	/** A flat ring in the plane facing +X, of radius 1, each triangle in both windings. */
 	void BuildRing(UProceduralMeshComponent* Ring)
@@ -169,6 +208,21 @@ namespace
 		Frame->CreateMeshSection(0, Vertices, Triangles, NoNormals, NoUVs, NoColours, NoTangents, false);
 		Frame->SetCastShadow(false);
 		Frame->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	/** A filled rectangle Width by Height about the origin in the panel's plane, each triangle in both windings. */
+	void BuildQuad(UProceduralMeshComponent* Mesh, double Width, double Height)
+	{
+		const TArray<FVector> Vertices = {OnPanel(-Width / 2.0, -Height / 2.0), OnPanel(Width / 2.0, -Height / 2.0), OnPanel(Width / 2.0, Height / 2.0),
+			OnPanel(-Width / 2.0, Height / 2.0)};
+		const TArray<int32> Triangles = {0, 1, 2, 0, 2, 3, 0, 2, 1, 0, 3, 2};
+		const TArray<FVector> NoNormals;
+		const TArray<FVector2D> NoUVs;
+		const TArray<FColor> NoColours;
+		const TArray<FProcMeshTangent> NoTangents;
+		Mesh->CreateMeshSection(0, Vertices, Triangles, NoNormals, NoUVs, NoColours, NoTangents, false);
+		Mesh->SetCastShadow(false);
+		Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
 
 	/** A distance, with fewer decimals the larger it is. */
@@ -243,6 +297,34 @@ AStarPointer::AStarPointer()
 		Text->SetVerticalAlignment(EVRTA_TextTop);
 	}
 	VoiceLine->SetVerticalAlignment(EVRTA_TextBottom);
+
+	GrabBar = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("GrabBar"));
+	GrabBar->SetupAttachment(Panel);
+	GrabBar->SetRelativeLocation(OnPanel(0.0, BarUp));
+	ActionsFrame = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("ActionsFrame"));
+	ActionsFrame->SetupAttachment(Panel);
+	ActionsFrame->SetRelativeLocation(OnPanel(ButtonRight, ButtonUp));
+	ActionsText = CreateDefaultSubobject<UTextRenderComponent>(TEXT("ActionsText"));
+	ActionsText->SetupAttachment(Panel);
+	ActionsText->SetRelativeLocation(OnPanel(ButtonRight, ButtonUp));
+	ActionsText->SetWorldSize(TitleSize);
+	ActionsText->SetText(FText::FromString(TEXT("...")));
+	ActionsText->SetHorizontalAlignment(EHTA_Center);
+	ActionsText->SetVerticalAlignment(EVRTA_TextCenter);
+	MenuFrame = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("MenuFrame"));
+	MenuFrame->SetupAttachment(Panel);
+	MenuFrame->SetRelativeLocation(OnPanel(MenuRight, MenuTop - MenuHeight / 2.0));
+	for (int32 Item = 0; Item < MenuCount; ++Item)
+	{
+		UTextRenderComponent* Text = CreateDefaultSubobject<UTextRenderComponent>(*FString::Printf(TEXT("MenuItem%d"), Item));
+		Text->SetupAttachment(Panel);
+		Text->SetRelativeLocation(OnPanel(MenuRight - MenuWidth / 2.0 + PanelPadding, ItemUp(Item)));
+		Text->SetWorldSize(DetailsSize);
+		Text->SetText(FText::FromString(MenuLabels[Item]));
+		Text->SetHorizontalAlignment(EHTA_Left);
+		Text->SetVerticalAlignment(EVRTA_TextCenter);
+		MenuItems.Add(Text);
+	}
 }
 
 void AStarPointer::BeginPlay()
@@ -256,12 +338,25 @@ void AStarPointer::BeginPlay()
 	SelectionRing->SetMaterial(0, ColouredMaterial(SelectionColour));
 	BuildFrame(Frame, PanelWidth, PanelHeight, FrameThickness);
 	Frame->SetMaterial(0, ColouredMaterial(FrameColour));
+	// The bar, the button and the list are for the headset's ray; the desktop has the console.
+	BuildQuad(GrabBar, BarWidth, BarHeight);
+	GrabBarMaterial = ColouredMaterial(BarColour);
+	GrabBar->SetMaterial(0, GrabBarMaterial);
+	BuildFrame(ActionsFrame, ButtonWidth, ButtonHeight, FrameThickness);
+	ActionsFrame->SetMaterial(0, ColouredMaterial(FrameColour));
+	BuildFrame(MenuFrame, MenuWidth, MenuHeight, FrameThickness);
+	MenuFrame->SetMaterial(0, ColouredMaterial(FrameColour));
 	if (UMaterialInterface* Text = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/M_Label.M_Label")))
 	{
 		Title->SetTextMaterial(Text);
 		Details->SetTextMaterial(Text);
 		Hint->SetTextMaterial(Text);
 		VoiceLine->SetTextMaterial(Text);
+		ActionsText->SetTextMaterial(Text);
+		for (UTextRenderComponent* Item : MenuItems)
+		{
+			Item->SetTextMaterial(Text);
+		}
 	}
 	UStaticMesh* Sphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	Dots->SetStaticMesh(Sphere);
@@ -546,8 +641,10 @@ void AStarPointer::Tick(float DeltaSeconds)
 	const TArray<FRay, TInlineAllocator<2>> Rays = GetRays(Head, HeadRotation);
 	const double Now = GetWorld()->GetRealTimeSeconds();
 	Hovered = INDEX_NONE;
+	Aimed = PartNone;
 	int32 Pinched = 0;
 	bool bPointing = false;
+	bool bAimingPanel = false;
 	for (const FRay& Ray : Rays)
 	{
 		FHand& State = Hands[Ray.Hand];
@@ -560,7 +657,12 @@ void AStarPointer::Tick(float DeltaSeconds)
 		}
 		bPointing = true;
 		const int32 Star = StarField->FindStar(Ray.Origin, Ray.Direction, MaxPointingAngleDegrees);
-		State.Recent.Add({Now, Star, Ray.Gap});
+		// In a headset the ray may meet the panel, its bar, its button or its list first.
+		double Along = 0.0;
+		const int32 Part = bHeadset && bPointingStarted ? HitPanel(Ray.Origin, Ray.Direction, Along) : PartNone;
+		Aimed = Part;
+		AimedAlong = Along;
+		State.Recent.Add({Now, Star, Ray.Gap, Part, Along});
 		State.Recent.RemoveAll([Now](const FSighting& Sighting) { return Sighting.Time < Now - PinchLookBackSeconds; });
 		// A pinch (or click) that has just started keeps what this ray pointed at as the
 		// fingers began to close; with a star kept, two in quick succession let it go.
@@ -572,16 +674,34 @@ void AStarPointer::Tick(float DeltaSeconds)
 				Widest = FMath::Max(Widest, Sighting.Gap);
 			}
 			int32 Before = State.Recent[0].Star;
+			int32 PartBefore = State.Recent[0].Part;
+			double AlongBefore = State.Recent[0].Along;
 			for (const FSighting& Sighting : State.Recent)
 			{
 				if (Sighting.Gap >= Widest - PinchOnset)
 				{
 					Before = Sighting.Star;
+					PartBefore = Sighting.Part;
+					AlongBefore = Sighting.Along;
 				}
 			}
 			UE_LOG(LogStarPointer, Display, TEXT("Pinch with hand %d, thumb to index %.1f cm (widest %.1f): pointing at %d now, %d before"), Ray.Hand, Ray.Gap,
 				Widest, Star, Before);
-			if (Now < GateUntil)
+			if ((PartBefore != PartNone || bMenuOpen) && Now >= GateUntil)
+			{
+				// The panel's, not a star's: pinching off the panel with the list open closes it.
+				UE_LOG(LogStarPointer, Display, TEXT("Pinch on the panel, part %d"), PartBefore);
+				if (PartBefore != PartNone)
+				{
+					PressPanel(PartBefore, Ray.Origin, Ray.Direction, AlongBefore);
+				}
+				else
+				{
+					bMenuOpen = false;
+				}
+				GateUntil = Now + PanelGateSeconds;
+			}
+			else if (Now < GateUntil)
 			{
 				UE_LOG(LogStarPointer, Display, TEXT("Pinch ignored: %.2f s after the ray was turned on or a star was kept or let go"),
 					Now - (GateUntil - GestureGateSeconds));
@@ -608,22 +728,43 @@ void AStarPointer::Tick(float DeltaSeconds)
 		}
 		State.bWasPinched = Ray.bPinched;
 
-		// A kept star holds the panel, and in a headset the ray goes until the star is let go;
-		// on the desktop the cursor still rings the star under it.
-		if (bPointingStarted && (Selected == INDEX_NONE || !bHeadset))
+		// Carrying the panel by its bar: it goes where the ray goes, at the distance grabbed,
+		// and stays in that place in the view when let go.
+		if (bCarrying)
 		{
-			Hovered = Star;
+			if (Ray.bPinched)
+			{
+				PanelPlace = PanelRotation.UnrotateVector(Ray.Origin + Ray.Direction * CarryAlong + CarryGrip - Head);
+			}
+			else
+			{
+				bCarrying = false;
+				UE_LOG(LogStarPointer, Display, TEXT("Panel put down at %s (forward, right, up from the head)"), *PanelPlace.ToString());
+			}
+		}
+
+		// A kept star holds the panel, and in a headset the ray goes until the star is let go,
+		// except over the panel, which it then stops at; on the desktop the cursor still rings
+		// the star under it.
+		bAimingPanel = Part != PartNone || bCarrying;
+		if (bPointingStarted && (Selected == INDEX_NONE || !bHeadset || bAimingPanel))
+		{
+			if (!bAimingPanel)
+			{
+				Hovered = Star;
+			}
+			const double Reach = bCarrying ? CarryAlong : bAimingPanel ? Along : LastDot;
 			for (int32 Dot = 0; Dot < DotCount; ++Dot)
 			{
 				const double Distance = FirstDot * FMath::Pow(LastDot / FirstDot, double(Dot) / (DotCount - 1));
-				const double Diameter = FMath::Max(SmallestDot, Distance * DotAngularDiameter);
+				const double Diameter = Distance <= Reach ? FMath::Max(SmallestDot, Distance * DotAngularDiameter) : 0.0;
 				// The basic sphere is 100 units across.
 				Dots->UpdateInstanceTransform(Dot, FTransform(FQuat::Identity, Ray.Origin + Ray.Direction * Distance, FVector(Diameter / 100.0)),
 					true, Dot == DotCount - 1, true);
 			}
 		}
 	}
-	Dots->SetVisibility(bHeadset && bPointing && bPointingStarted && Selected == INDEX_NONE);
+	Dots->SetVisibility(bHeadset && bPointing && bPointingStarted && (Selected == INDEX_NONE || bAimingPanel));
 	if (Mouse.IsValid() || !Queued.IsEmpty())
 	{
 		UseMouse(Head, HeadRotation);
@@ -652,6 +793,87 @@ void AStarPointer::Tick(float DeltaSeconds)
 	PlaceRing(HoverRing, Hovered != Selected && !bMovingView ? Hovered : INDEX_NONE, Head);
 	PlaceRing(SelectionRing, Selected, Head);
 	PlacePanel(Head, HeadRotation, DeltaSeconds);
+	if (NoteUntil > 0.0 && Now > NoteUntil)
+	{
+		SetVoiceLine(FString(), false);
+		NoteUntil = 0.0;
+	}
+}
+
+int32 AStarPointer::HitPanel(const FVector& Origin, const FVector& Direction, double& Along) const
+{
+	// In the panel's own frame, where it is the plane X = 0, facing +X, right along -Y (OnPanel).
+	const FTransform& Transform = Panel->GetComponentTransform();
+	const FVector From = Transform.InverseTransformPosition(Origin);
+	const FVector Towards = Transform.InverseTransformVectorNoScale(Direction);
+	if (FMath::Abs(Towards.X) < UE_KINDA_SMALL_NUMBER)
+	{
+		return PartNone;
+	}
+	const double At = -From.X / Towards.X;
+	if (At <= 0.0)
+	{
+		return PartNone;
+	}
+	const FVector Hit = From + Towards * At;
+	const double Right = -Hit.Y;
+	const double Up = Hit.Z;
+	const auto Within = [Right, Up](double CentreRight, double CentreUp, double Width, double Height, double Margin) {
+		return FMath::Abs(Right - CentreRight) <= Width / 2.0 + Margin && FMath::Abs(Up - CentreUp) <= Height / 2.0 + Margin;
+	};
+	Along = At;
+	if (bMenuOpen)
+	{
+		for (int32 Item = 0; Item < MenuCount; ++Item)
+		{
+			if (Within(MenuRight, ItemUp(Item), MenuWidth, ItemHeight, 0.0))
+			{
+				return PartItem + Item;
+			}
+		}
+		if (Within(MenuRight, MenuTop - MenuHeight / 2.0, MenuWidth, MenuHeight, HitMargin))
+		{
+			return PartBody;
+		}
+	}
+	if (Within(ButtonRight, ButtonUp, ButtonWidth, ButtonHeight, HitMargin))
+	{
+		return PartActions;
+	}
+	// The bar is thin: it counts for more than its height, as a visionOS window's does.
+	if (Within(0.0, BarUp, BarWidth, BarHeight * 3.0, HitMargin))
+	{
+		return PartBar;
+	}
+	return Within(0.0, 0.0, PanelWidth, PanelHeight, 0.0) ? PartBody : PartNone;
+}
+
+void AStarPointer::PressPanel(int32 Part, const FVector& Origin, const FVector& Direction, double Along)
+{
+	if (Part == PartBar)
+	{
+		bCarrying = true;
+		CarryAlong = Along;
+		CarryGrip = Panel->GetComponentLocation() - (Origin + Direction * Along);
+	}
+	else if (Part == PartActions)
+	{
+		bMenuOpen = !bMenuOpen;
+	}
+	else if (Part >= PartItem && Part < PartItem + MenuCount)
+	{
+		bMenuOpen = false;
+		const FString Command = MenuLabels[Part - PartItem];
+		const FString Result = Actions != nullptr ? Actions->Run(Command) : FString(TEXT("No actions"));
+		UE_LOG(LogStarPointer, Display, TEXT("Panel list: \"%s\": %s"), *Command, *Result);
+		ShowNote(Result);
+	}
+}
+
+void AStarPointer::ShowNote(const FString& Text)
+{
+	SetVoiceLine(Text, false);
+	NoteUntil = GetWorld()->GetRealTimeSeconds() + NoteSeconds;
 }
 
 void AStarPointer::Select(int32 Star)
@@ -877,8 +1099,30 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 	const FQuat Target = HeadRotation.Quaternion();
 	PanelRotation = bPanelPlaced ? FQuat::Slerp(PanelRotation, Target, 1.0 - FMath::Exp(-DeltaSeconds / PanelFollowSeconds)) : Target;
 	bPanelPlaced = true;
-	// Facing back along the view, as text faces along its +X.
-	Panel->SetWorldLocationAndRotation(Head + PanelRotation.RotateVector(PanelOffset), PanelRotation * FQuat(FVector::UpVector, PI));
+	// Facing the head, as text faces along its +X, upright to the view: square on wherever its
+	// bar has carried it.
+	const FVector Place = Head + PanelRotation.RotateVector(PanelPlace);
+	Panel->SetWorldLocationAndRotation(Place, FRotationMatrix::MakeFromXZ(Head - Place, PanelRotation.GetUpVector()).ToQuat());
+
+	// The bar, the button and the list: brighter under the ray, and only in a headset (or on
+	// the desktop with -PanelControls, the list open, to check their layout).
+	static const bool bShowControls = FParse::Param(FCommandLine::Get(), TEXT("PanelControls"));
+	const bool bControls = bHeadset || bShowControls;
+	const bool bList = (bHeadset && bMenuOpen) || bShowControls;
+	GrabBar->SetVisibility(bControls);
+	ActionsFrame->SetVisibility(bControls);
+	ActionsText->SetVisibility(bControls);
+	MenuFrame->SetVisibility(bList);
+	if (GrabBarMaterial != nullptr)
+	{
+		GrabBarMaterial->SetVectorParameterValue(TEXT("Colour"), (Aimed == PartBar || bCarrying ? SelectionColour : BarColour) * OverlayBrightness);
+	}
+	ActionsText->SetTextRenderColor(((Aimed == PartActions || bMenuOpen ? SelectionColour : DetailsColour) * OverlayBrightness).ToFColor(false));
+	for (int32 Item = 0; Item < MenuItems.Num(); ++Item)
+	{
+		MenuItems[Item]->SetVisibility(bList);
+		MenuItems[Item]->SetTextRenderColor(((Aimed == PartItem + Item ? SelectionColour : DetailsColour) * OverlayBrightness).ToFColor(false));
+	}
 
 	if (BothPinchedSeconds > 0.0)
 	{
@@ -901,7 +1145,7 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 				FMath::Abs(Right), Up > 0.0 ? TEXT("up") : TEXT("down"), FMath::Abs(Up))));
 			return;
 		}
-		Hint->SetText(FText::FromString(!bHeadset ? TEXT("Middle-drag orbits it; click the sky to let go")
+		Hint->SetText(FText::FromString(!bHeadset ? TEXT("Middle-drag to orbit; click sky to let go")
 				: bUsingControllers               ? TEXT("Pull the trigger twice to let it go")
 												  : TEXT("Pinch twice to let it go")));
 		return;
