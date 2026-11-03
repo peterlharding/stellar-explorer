@@ -86,6 +86,12 @@ Each entry says where the idea came from and which phase it most likely belongs 
 
 ## Data
 
+- **Showing where the catalogue runs out.** The catalogue is limited by how bright a star looks from Earth, so it is a ball of stars around the Sun: nearly complete to about 20 pc, thinning to only the most luminous by a few hundred parsecs (113,012 stars; 13,449 beyond 500 pc).
+  From a star far out the sky is lopsided, crowded towards the Sun and nearly empty away from it: from HD 36655, 962 pc out, almost every star is on one side.
+  A faint shell or outline of the region where the catalogue is reasonably complete (or the limiting magnitude's reach, by luminosity) would make the emptiness read as "no data here", not "no stars here"; perhaps also a note on the panel when the view is beyond it.
+  From PLH, 3 November 2026, in the headset, after going to HD 36655 and Alnilam.
+  Phase 2 or 3; the gap itself closes only with more stars (AT-HYG, then Gaia, phase 7).
+
 - **A catalogue of open clusters.** Centres, distances, radii and member stars, so a view can be sized to a cluster and its members picked out; candidates are Hunt and Reffert (2023, from Gaia DR3) and Cantat-Gaudin and others (2020).
   Needed by the close-up of a region (F6).
   From the direction discussion, 30 October 2026.
