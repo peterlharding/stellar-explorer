@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- The app's control service listens again when the app is restarted soon after quitting with a console connected; before, the port stayed blocked for about half a minute and no console could reach the app. A second app on the same port is still refused.
 - `scripts/make_macos.sh` builds the core libraries when run (`mac`, `visionos`, or both by default) and runs the macOS tests; before, it only defined the build functions, and was not executable.
 
 ## [0.1.0] - 2026-11-04
