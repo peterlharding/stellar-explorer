@@ -6,6 +6,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- On the Vision Pro, a hand menu: touch the button on the back of the other hand's wrist with the pointing hand's index finger, and a column of buttons opens beside it, pressed the same way: Go there, Back off, Closer, Return to the Sun, Let go, and Hide info or Show info. A dot shows where the fingertip is. The menu stays where it opened, upright and facing the viewer, until the wrist button is touched again. (Not the palm turned up, which brings up visionOS's Home button.)
+- "Hide info" and "Show info", spoken, typed in the console, on its buttons, or on the menus: the panel describing the star stays hidden until shown again. Also "hide the panel", "show details" and other ways of saying it.
+
+### Changed
+
+- In a headset the panel goes after 3 seconds with no star pointed at or kept, and comes back as soon as one is.
+- On the Vision Pro the "..." button and its list above the panel are gone, replaced by the hand menu; with the Vive's controllers they stay, with Hide info added.
+- A spoken command after the wake word is acted on once it has stood for 0.4 seconds (0.8 with a star's name), even while other people nearby go on talking; before, it waited for all speech to stop.
+- The panel's build line is shorter ("v0.1.0, build f2dd258+changes"), so it fits inside the frame.
+- The core's interface version is 5: rebuild the core libraries after pulling (`scripts/make_macos.sh`, and `build-msvc` on Windows).
+
 ### Fixed
 
 - The app's control service listens again when the app is restarted soon after quitting with a console connected; before, the port stayed blocked for about half a minute and no console could reach the app. A second app on the same port is still refused.
