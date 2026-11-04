@@ -20,7 +20,7 @@ extern "C" {
 #endif
 
 /* ABI version of this library; a caller checks it matches this header. */
-#define STC_ABI_VERSION 4u
+#define STC_ABI_VERSION 5u
 uint32_t stc_abi_version(void);
 
 /* A position in parsecs, right-handed ICRS equatorial Cartesian. POD, by value. */
@@ -117,7 +117,9 @@ typedef enum StcVoiceAction
 	STC_VOICE_BACK_OFF = 6,      /* "back off": further from the star kept or pointed at */
 	STC_VOICE_CLOSER = 7,        /* "closer": nearer the star kept or pointed at */
 	STC_VOICE_ALIGN_GALACTIC = 8, /* "galactic north": the galactic north pole up on the screen */
-	STC_VOICE_ALIGN_CELESTIAL = 9 /* "celestial north": the celestial north pole up, as at start */
+	STC_VOICE_ALIGN_CELESTIAL = 9, /* "celestial north": the celestial north pole up, as at start */
+	STC_VOICE_HIDE_INFO = 10,     /* "hide info": the panel describing the star, hidden until shown */
+	STC_VOICE_SHOW_INFO = 11      /* "show info": the panel shown again */
 } StcVoiceAction;
 
 /* Capacity (including the NUL) of StcVoiceCommand's target: what was heard. */

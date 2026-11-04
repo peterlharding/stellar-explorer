@@ -31,6 +31,18 @@ namespace stellar::core
 			Phrase{"galactic north", VoiceAction::AlignGalactic},
 			Phrase{"align to celestial north", VoiceAction::AlignCelestial},
 			Phrase{"celestial north", VoiceAction::AlignCelestial},
+			Phrase{"hide the info", VoiceAction::HideInfo},
+			Phrase{"hide info", VoiceAction::HideInfo},
+			Phrase{"hide the panel", VoiceAction::HideInfo},
+			Phrase{"hide panel", VoiceAction::HideInfo},
+			Phrase{"hide details", VoiceAction::HideInfo},
+			Phrase{"info off", VoiceAction::HideInfo},
+			Phrase{"show the info", VoiceAction::ShowInfo},
+			Phrase{"show info", VoiceAction::ShowInfo},
+			Phrase{"show the panel", VoiceAction::ShowInfo},
+			Phrase{"show panel", VoiceAction::ShowInfo},
+			Phrase{"show details", VoiceAction::ShowInfo},
+			Phrase{"info on", VoiceAction::ShowInfo},
 			Phrase{"back off", VoiceAction::BackOff},
 			Phrase{"back up", VoiceAction::BackOff},
 			Phrase{"move back", VoiceAction::BackOff},
@@ -479,7 +491,8 @@ namespace stellar::core
 			}
 		}
 		if (command.action == VoiceAction::LetGo || command.action == VoiceAction::GoThere || command.action == VoiceAction::BackOff ||
-			command.action == VoiceAction::Closer || command.action == VoiceAction::AlignGalactic || command.action == VoiceAction::AlignCelestial)
+			command.action == VoiceAction::Closer || command.action == VoiceAction::AlignGalactic || command.action == VoiceAction::AlignCelestial ||
+			command.action == VoiceAction::HideInfo || command.action == VoiceAction::ShowInfo)
 		{
 			return command;
 		}

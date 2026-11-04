@@ -12,7 +12,8 @@ class AStarPointer;
 
 /**
  * Spoken commands: "Show Vega", "Go to Delta Pavonis", "Go there" (to the star kept or
- * pointed at), "Back off" and "Closer" (from and to it), "Return to the Sun", "Let go".
+ * pointed at), "Back off" and "Closer" (from and to it), "Return to the Sun", "Let go",
+ * "Hide info" and "Show info".
  *
  * The platform's recogniser (FVoiceRecognizer) hears the words; the core (stc_voice_*)
  * turns them into a command and a star, from the names AStarActions reads, and
@@ -20,6 +21,8 @@ class AStarPointer;
  *  - Push to talk: hold a pinch on the hand that does not point (Vision Pro), a grip
  *    button (Vive) or V (desktop), say the command, and let go.
  *  - Wake word: say "Stellar, go to Sirius" at any time; the command is acted on once
+ *    it has stood unchanged for CommandPauseSeconds (WakePauseSeconds with a star's name,
+ *    which the recogniser may still correct), whatever else is still being said, or once
  *    the words stop for WakePauseSeconds.
  * What was heard shows just above the panel, and the time from the end of speaking to
  * acting is logged, for the voice spike.
@@ -76,6 +79,14 @@ private:
 	UPROPERTY(Config)
 	float WakePauseSeconds = 0.8f;
 
+	/**
+	 * With the wake word, a command needing no star's name is acted on once it has stood this
+	 * long, though other words go on: speech nearby need not hold it up. A named star waits
+	 * WakePauseSeconds, as the recogniser may yet correct the name.
+	 */
+	UPROPERTY(Config)
+	float CommandPauseSeconds = 0.4f;
+
 	TUniquePtr<FVoiceRecognizer> Recognizer;
 	/** The names, from AStarActions; null until listening starts. */
 	const StcVoice* Voice = nullptr;
@@ -93,6 +104,10 @@ private:
 	FString LastText;
 	double LastChange = 0.0;
 	bool bActed = false;
+	/** Wake word: the command in the words so far (an StcVoiceAction and a star), and since when it has been that. */
+	int32 LastAction = STC_VOICE_NONE;
+	int64 LastStar = -1;
+	double CommandSince = 0.0;
 	FString LoggedStatus;
 	double LineUntil = 0.0;
 };
