@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+
+- `scripts/make_macos.sh` builds the core libraries when run (`mac`, `visionos`, or both by default) and runs the macOS tests; before, it only defined the build functions, and was not executable.
+
 ## [0.1.0] - 2026-11-04
 
 See [release_notes/v0.1.0.md](release_notes/v0.1.0.md) for details.
