@@ -25,7 +25,9 @@ class UTextRenderComponent;
  * orbits, Shift + middle-drag pans, the wheel zooms, "." or F faces it (FDesktopMouse).
  *
  * In a headset the panel has a grab bar below it (pinch it and move to carry the panel to
- * another place in the view). The commands needing no star's name (Go there, Back off, ...,
+ * another place in the view), with a button beside it that hides the panel. On the Vision Pro
+ * a pinch also acts on what the eyes were on as it began (GazePinch): look at a star and pinch
+ * to keep it, at a button to press it, at the panel or a bar to move it with the hand. The commands needing no star's name (Go there, Back off, ...,
  * Hide info) are on a menu opened and closed by a button on the back of the other hand's wrist,
  * both pressed with the pointing hand's index finger; with controllers instead, on a list opened by a "..."
  * button above the panel. The ray shows whenever it points at the panel, even with a star
@@ -176,6 +178,17 @@ private:
 	FString MenuLabel(int32 Item) const;
 	/** Run an item of the actions list or the hand menu, and show what it did. */
 	void RunMenuItem(int32 Item);
+	/**
+	 * The hand menu's part at a point on it (right, up from its centre): an item, HandPartBar,
+	 * HandPartHide, or INDEX_NONE; items reach Margin beyond the column's ends.
+	 */
+	int32 HandMenuPartAt(double Right, double Up, double Margin) const;
+	/**
+	 * Look-and-pinch (GazePinch): a pinch presses what the wearer looked at as it began, a hand
+	 * menu item or a hide button, or keeps the star; on the panel or a bar, the hand moves it
+	 * until the pinch ends.
+	 */
+	void UseGazePinches(const FVector& Head);
 	/** Show a line above the panel for a while, as voice and the console do. */
 	void ShowNote(const FString& Text);
 	void ShowStar(int32 Star, const FLinearColor& Colour);
@@ -249,6 +262,16 @@ private:
 	UPROPERTY()
 	TObjectPtr<UMaterialInstanceDynamic> GrabBarMaterial;
 
+	/** The button beside the grab bar that hides the panel, a cross in a ring. */
+	UPROPERTY()
+	TObjectPtr<UProceduralMeshComponent> HideRing;
+
+	UPROPERTY()
+	TObjectPtr<UProceduralMeshComponent> HideCross;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> HideMaterial;
+
 	/** The "..." button above the panel's right end, which opens the actions list. */
 	UPROPERTY()
 	TObjectPtr<UProceduralMeshComponent> ActionsFrame;
@@ -275,6 +298,22 @@ private:
 
 	UPROPERTY()
 	TArray<TObjectPtr<UTextRenderComponent>> HandItems;
+
+	/** Under the hand menu: a bar to move it by, and beside it a button that closes it. */
+	UPROPERTY()
+	TObjectPtr<UProceduralMeshComponent> HandBar;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> HandBarMaterial;
+
+	UPROPERTY()
+	TObjectPtr<UProceduralMeshComponent> HandHideRing;
+
+	UPROPERTY()
+	TObjectPtr<UProceduralMeshComponent> HandHideCross;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> HandHideMaterial;
 
 	/** The button on the back of the other hand's wrist that opens and closes the hand menu. */
 	UPROPERTY()
@@ -359,7 +398,7 @@ private:
 	bool bWristArmed = false;
 	/** The pointing fingertip is at the hand menu or the wrist button this frame: it presses, not points. */
 	bool bFingerAtMenu = false;
-	/** The item under the fingertip, or INDEX_NONE; the one last pressed, lit until HandPressedUntil. */
+	/** The part under the fingertip (HandMenuPartAt), or INDEX_NONE; the one last pressed, lit until HandPressedUntil. */
 	int32 HandAimed = INDEX_NONE;
 	int32 HandPressed = INDEX_NONE;
 	double HandPressedUntil = 0.0;
@@ -367,6 +406,19 @@ private:
 	bool bPokeArmed = false;
 	double PokeDepth = 0.0;
 	double PokeGateUntil = 0.0;
+	/** Listening for look-and-pinch (GazePinch), once the engine's immersive layer is there. */
+	bool bGazeListening = false;
+	/**
+	 * What a look-and-pinch is moving (MoveNone, MovePanel or MoveHandMenu) and by which pinch:
+	 * where it and the hand were as it began, and how much further it goes than the hand.
+	 */
+	int32 GazeMoving = 0;
+	uint64 GazeMovingId = 0;
+	FVector GazeMoveFrom = FVector::ZeroVector;
+	FVector GazeHandFrom = FVector::ZeroVector;
+	double GazeMoveGain = 1.0;
+	/** A pinch the system reports twice begins twice: the second within GazeEchoSeconds is ignored. */
+	double GazeEchoUntil = 0.0;
 	/** For the log, while the menu shows: the nearest the fingertip came to it, and where, in its frame. */
 	double FingerNearest = TNumericLimits<double>::Max();
 	FVector FingerNearestAt = FVector::ZeroVector;
