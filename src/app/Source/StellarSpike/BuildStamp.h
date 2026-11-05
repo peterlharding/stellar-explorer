@@ -20,6 +20,19 @@ inline FString StellarVersion()
 	return GetDefault<UGeneralProjectSettings>()->ProjectVersion;
 }
 
+/** The commit as git abbreviates it, seven characters, with any "+changes" after: for the headset's panel, where space is short. */
+inline FString StellarShortCommit()
+{
+	const FString Stamp = STELLAR_SPIKE_COMMIT;
+	FString Commit;
+	FString Changes;
+	if (!Stamp.Split(TEXT("+"), &Commit, &Changes))
+	{
+		return Stamp.Left(7);
+	}
+	return Commit.Left(7) + TEXT("+") + Changes;
+}
+
 /** The version and the build stamp, for the log and the console: "Version 0.1.0, build 2e9cca0a0406 on devel, built ...". */
 inline FString StellarBuild()
 {

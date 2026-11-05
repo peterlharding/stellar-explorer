@@ -57,6 +57,8 @@ Built on the Mac with the **Xcode generator**, into `<build>/Release/` to match 
 - macOS (Apple silicon): `src/core/build-mac/Release/{libstellar_core.a, libsqlite3.a}`
 - visionOS (device): `src/core/build-visionos/Release/{libstellar_core.a, libsqlite3.a}`
 
+On a Mac, `scripts/make_macos.sh` builds both, and runs the macOS tests; `mac` or `visionos` builds one.
+
 ### macOS (arm64)
 
 ```sh

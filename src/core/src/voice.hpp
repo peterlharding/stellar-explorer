@@ -23,6 +23,8 @@ namespace stellar::core
 		Closer = 7,
 		AlignGalactic = 8,
 		AlignCelestial = 9,
+		HideInfo = 10,
+		ShowInfo = 11,
 	};
 
 	struct VoiceCommand

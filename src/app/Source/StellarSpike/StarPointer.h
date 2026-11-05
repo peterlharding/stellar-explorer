@@ -25,10 +25,16 @@ class UTextRenderComponent;
  * orbits, Shift + middle-drag pans, the wheel zooms, "." or F faces it (FDesktopMouse).
  *
  * In a headset the panel has a grab bar below it (pinch it and move to carry the panel to
- * another place in the view) and a "..." button above it that opens a list of the commands
- * needing no star's name (Go there, Back off, ...). The ray shows whenever it points at them,
- * even with a star kept. -PanelControls shows them on the desktop too, to check the layout. The star pointed at is ringed and described
- * in a panel at the bottom right of the view, which follows the head. In a headset the ray
+ * another place in the view), with a button beside it that hides the panel. On the Vision Pro
+ * a pinch also acts on what the eyes were on as it began (GazePinch): look at a star and pinch
+ * to keep it, at a button to press it, at the panel or a bar to move it with the hand. The commands needing no star's name (Go there, Back off, ...,
+ * Hide info) are on a menu opened and closed by a button on the back of the other hand's wrist,
+ * both pressed with the pointing hand's index finger; with controllers instead, on a list opened by a "..."
+ * button above the panel. The ray shows whenever it points at the panel, even with a star
+ * kept. -PanelControls shows them all on the desktop too, to check the layout. The star
+ * pointed at is ringed and described in a panel at the bottom right of the view, which follows
+ * the head. In a headset the panel goes after a few seconds with nothing pointed at or kept,
+ * and "Hide info" hides it until "Show info". In a headset the ray
  * is off at start, and a first pinch turns it on. A pinch then keeps the
  * star: it is ringed in another colour, the panel stays on it, and the ray goes until two
  * pinches in quick succession let the star go. Pinching both hands for
@@ -80,6 +86,10 @@ public:
 
 	/** In a headset with hands, whether the hand that does not point is pinched on its own (push to talk). */
 	bool IsOtherHandPinched() const;
+
+	/** Show or hide the panel describing the star; hidden, it stays so until shown again. */
+	void SetInfoShown(bool bShown);
+	bool IsInfoShown() const { return bInfoShown; }
 
 	/** A line just above the panel, for what voice heard and did; empty hides it. Active is brighter. */
 	void SetVoiceLine(const FString& Text, bool bActive);
@@ -133,6 +143,14 @@ private:
 		FVector Direction = FVector::ZeroVector;
 		/** Recent frames: a pinch selects what was pointed at before the fingers began to close. */
 		TArray<FSighting, TInlineAllocator<64>> Recent;
+		/** Tracked as a hand this frame (not a controller), with its index fingertip and palm. */
+		bool bHandTracked = false;
+		FVector IndexTip = FVector::ZeroVector;
+		FVector Palm = FVector::ZeroVector;
+		/** Out of the palm, a unit vector; zero if the joints to find it are not tracked. */
+		FVector PalmNormal = FVector::ZeroVector;
+		FVector Wrist = FVector::ZeroVector;
+		double Gap = 0.0;
 	};
 
 	static constexpr int32 MouseHand = 2;
@@ -152,6 +170,25 @@ private:
 	int32 HitPanel(const FVector& Origin, const FVector& Direction, double& Along) const;
 	/** A pinch on a part of the panel: grab it, open or close the list, or run an item. */
 	void PressPanel(int32 Part, const FVector& Origin, const FVector& Direction, double Along);
+	/** The hand menu: open and close it by the wrist button, and press its items, with the pointing finger. */
+	void UpdateHandMenu(const FVector& Head, const FRotator& HeadRotation, float DeltaSeconds);
+	/** Close the hand menu, logging where the fingertip went while it was open. */
+	void CloseHandMenu();
+	/** The label of an item of the actions list and the hand menu: "Hide info" or "Show info" as it is. */
+	FString MenuLabel(int32 Item) const;
+	/** Run an item of the actions list or the hand menu, and show what it did. */
+	void RunMenuItem(int32 Item);
+	/**
+	 * The hand menu's part at a point on it (right, up from its centre): an item, HandPartBar,
+	 * HandPartHide, or INDEX_NONE; items reach Margin beyond the column's ends.
+	 */
+	int32 HandMenuPartAt(double Right, double Up, double Margin) const;
+	/**
+	 * Look-and-pinch (GazePinch): a pinch presses what the wearer looked at as it began, a hand
+	 * menu item or a hide button, or keeps the star; on the panel or a bar, the hand moves it
+	 * until the pinch ends.
+	 */
+	void UseGazePinches(const FVector& Head);
 	/** Show a line above the panel for a while, as voice and the console do. */
 	void ShowNote(const FString& Text);
 	void ShowStar(int32 Star, const FLinearColor& Colour);
@@ -225,6 +262,16 @@ private:
 	UPROPERTY()
 	TObjectPtr<UMaterialInstanceDynamic> GrabBarMaterial;
 
+	/** The button beside the grab bar that hides the panel, a cross in a ring. */
+	UPROPERTY()
+	TObjectPtr<UProceduralMeshComponent> HideRing;
+
+	UPROPERTY()
+	TObjectPtr<UProceduralMeshComponent> HideCross;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> HideMaterial;
+
 	/** The "..." button above the panel's right end, which opens the actions list. */
 	UPROPERTY()
 	TObjectPtr<UProceduralMeshComponent> ActionsFrame;
@@ -238,6 +285,55 @@ private:
 
 	UPROPERTY()
 	TArray<TObjectPtr<UTextRenderComponent>> MenuItems;
+
+	/** The hand menu, beside the other hand: a framed button for each item. */
+	UPROPERTY()
+	TObjectPtr<USceneComponent> HandMenu;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UProceduralMeshComponent>> HandFrames;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> HandFrameMaterials;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UTextRenderComponent>> HandItems;
+
+	/** Under the hand menu: a bar to move it by, and beside it a button that closes it. */
+	UPROPERTY()
+	TObjectPtr<UProceduralMeshComponent> HandBar;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> HandBarMaterial;
+
+	UPROPERTY()
+	TObjectPtr<UProceduralMeshComponent> HandHideRing;
+
+	UPROPERTY()
+	TObjectPtr<UProceduralMeshComponent> HandHideCross;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> HandHideMaterial;
+
+	/** The button on the back of the other hand's wrist that opens and closes the hand menu. */
+	UPROPERTY()
+	TObjectPtr<USceneComponent> WristButton;
+
+	UPROPERTY()
+	TObjectPtr<UProceduralMeshComponent> WristRing;
+
+	UPROPERTY()
+	TObjectPtr<UTextRenderComponent> WristText;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> WristMaterial;
+
+	/** A dot on the hand menu under the pointing fingertip: where the app sees it, to aim the press by. */
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> FingerDot;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> FingerDotMaterial;
 
 	UPROPERTY()
 	TObjectPtr<AStarActions> Actions;
@@ -286,6 +382,47 @@ private:
 	/** When a line shown by ShowNote is to go. */
 	double NoteUntil = 0.0;
 	bool bPanelPlaced = false;
+	/** Shown, or hidden by "Hide info" until "Show info". */
+	bool bInfoShown = true;
+	/** Whether the panel's frame and text showed this frame: hidden, the ray passes through it. */
+	bool bInfoVisible = true;
+	/** When the panel was last in use (a star pointed at or kept, the ray on it): it goes a while after. */
+	double LastInUse = 0.0;
+	/** -PanelControls: the panel's controls and the hand menu on the desktop too, to check their layout. */
+	bool bShowControls = false;
+	/** The hand menu: open, where, from the viewer's pawn, and which way it faces. */
+	bool bHandMenuShown = false;
+	FVector HandMenuFromViewer = FVector::ZeroVector;
+	FQuat HandMenuRotation = FQuat::Identity;
+	/** The wrist button needs the fingertip away from it before each touch. */
+	bool bWristArmed = false;
+	/** The pointing fingertip is at the hand menu or the wrist button this frame: it presses, not points. */
+	bool bFingerAtMenu = false;
+	/** The part under the fingertip (HandMenuPartAt), or INDEX_NONE; the one last pressed, lit until HandPressedUntil. */
+	int32 HandAimed = INDEX_NONE;
+	int32 HandPressed = INDEX_NONE;
+	double HandPressedUntil = 0.0;
+	/** A press needs the fingertip in front of the menu first; it is set again as the finger draws back. */
+	bool bPokeArmed = false;
+	double PokeDepth = 0.0;
+	double PokeGateUntil = 0.0;
+	/** Listening for look-and-pinch (GazePinch), once the engine's immersive layer is there. */
+	bool bGazeListening = false;
+	/**
+	 * What a look-and-pinch is moving (MoveNone, MovePanel or MoveHandMenu) and by which pinch:
+	 * where it and the hand were as it began, and how much further it goes than the hand.
+	 */
+	int32 GazeMoving = 0;
+	uint64 GazeMovingId = 0;
+	FVector GazeMoveFrom = FVector::ZeroVector;
+	FVector GazeHandFrom = FVector::ZeroVector;
+	double GazeMoveGain = 1.0;
+	/** A pinch the system reports twice begins twice: the second within GazeEchoSeconds is ignored. */
+	double GazeEchoUntil = 0.0;
+	/** For the log, while the menu shows: the nearest the fingertip came to it, and where, in its frame. */
+	double FingerNearest = TNumericLimits<double>::Max();
+	FVector FingerNearestAt = FVector::ZeroVector;
+	int32 FingerFrames = 0;
 	double BothPinchedSeconds = 0.0;
 	bool bHeadset = false;
 	/** Set once a tracked controller is seen, so the panel says "trigger" rather than "pinch". */

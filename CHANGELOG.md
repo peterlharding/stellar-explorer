@@ -6,6 +6,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-05
+
+See [release_notes/v0.2.0.md](release_notes/v0.2.0.md) for details.
+
+### Added
+
+- On the Vision Pro, a hand menu: touch the button on the back of the other hand's wrist with the pointing hand's index finger, and a column of buttons opens beside it, pressed the same way: Go there, Back off, Closer, Return to the Sun, Let go, and Hide info or Show info. A dot shows where the fingertip is. The menu stays where it opened, upright and facing the viewer, until the wrist button is touched again. (Not the palm turned up, which brings up visionOS's Home button.)
+- On the Vision Pro, look and pinch: look at a star and pinch to keep it, at a hand menu button to press it, or at the panel, its bar or the hand menu's bar and pinch and move the hand to move it, as visionOS's own windows work.
+- A button beside the panel's bar that hides the panel, and under the hand menu a bar to move it by and a button that closes it, pressed by look and pinch (or, under the hand menu, by a touch).
+- "Hide info" and "Show info", spoken, typed in the console, on its buttons, or on the menus: the panel describing the star stays hidden until shown again. Also "hide the panel", "show details" and other ways of saying it.
+
+### Changed
+
+- In a headset the panel goes after 3 seconds with no star pointed at or kept, and comes back as soon as one is.
+- On the Vision Pro the "..." button and its list above the panel are gone, replaced by the hand menu; with the Vive's controllers they stay, with Hide info added.
+- A spoken command after the wake word is acted on once it has stood for 0.4 seconds (0.8 with a star's name), even while other people nearby go on talking; before, it waited for all speech to stop.
+- The panel's build line is shorter ("v0.1.0, build f2dd258+changes"), so it fits inside the frame.
+- The core's interface version is 5: rebuild the core libraries after pulling (`scripts/make_macos.sh`, and `build-msvc` on Windows).
+
+### Fixed
+
+- The app's control service listens again when the app is restarted soon after quitting with a console connected; before, the port stayed blocked for about half a minute and no console could reach the app. A second app on the same port is still refused.
+- `scripts/make_macos.sh` builds the core libraries when run (`mac`, `visionos`, or both by default) and runs the macOS tests; before, it only defined the build functions, and was not executable.
+
 ## [0.1.0] - 2026-11-04
 
 See [release_notes/v0.1.0.md](release_notes/v0.1.0.md) for details.
@@ -37,5 +61,6 @@ See [release_notes/v0.1.0.md](release_notes/v0.1.0.md) for details.
 
 - The control service carries out a command sent just before the console closes its connection, such as a `quit` piped through `nc`.
 
-[Unreleased]: https://github.com/peterlharding/stellar-explorer/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/peterlharding/stellar-explorer/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.2.0
 [0.1.0]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.1.0

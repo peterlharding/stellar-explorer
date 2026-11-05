@@ -53,7 +53,7 @@ namespace
 
 	/** The commands that need no star's name, as buttons. */
 	const TCHAR* const Buttons[] = {TEXT("Go there"), TEXT("Back off"), TEXT("Closer"), TEXT("Let go"), TEXT("Return to the Sun"),
-		TEXT("Galactic north"), TEXT("Celestial north")};
+		TEXT("Galactic north"), TEXT("Celestial north"), TEXT("Hide info"), TEXT("Show info")};
 
 	/** An ICRS vector from the control service in this app's frame (y flipped), scaled. */
 	bool ReadIcrs(const TSharedPtr<FJsonObject>& Message, const TCHAR* Field, double Scale, FVector& Out)

@@ -37,6 +37,21 @@ namespace
 	{
 		return {MakeShared<FJsonValueNumber>(V.X / Scale), MakeShared<FJsonValueNumber>(-V.Y / Scale), MakeShared<FJsonValueNumber>(V.Z / Scale)};
 	}
+
+	/** Whether something on this machine already accepts connections on the port. */
+	bool IsPortAnswering(int32 Port)
+	{
+		ISocketSubsystem* Sockets = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
+		FSocket* Probe = Sockets->CreateSocket(NAME_Stream, TEXT("StellarControlProbe"), false);
+		if (Probe == nullptr)
+		{
+			return false;
+		}
+		const bool bAnswering = Probe->Connect(*FIPv4Endpoint(FIPv4Address(127, 0, 0, 1), static_cast<uint16>(Port)).ToInternetAddr());
+		Probe->Close();
+		Sockets->DestroySocket(Probe);
+		return bAnswering;
+	}
 }
 
 AStarControl::AStarControl()
@@ -63,16 +78,24 @@ void AStarControl::BeginPlay()
 	}
 	LogTap = MakeShared<FLogTap>();
 	GLog->AddOutputDevice(LogTap.Get());
-	// Not reusable: a port already taken (by another instance, or a process that inherited
-	// its socket) must fail here, not leave two listeners where consoles reach the wrong one.
-	Listener = MakeShared<FTcpListener>(FIPv4Endpoint(FIPv4Address::Any, static_cast<uint16>(ControlPort)), FTimespan::FromMilliseconds(100), false);
+	// A port another instance listens on (or a process that inherited its socket) must fail
+	// here, not leave two listeners where consoles reach the wrong one. The engine's reuse
+	// allows exactly that (SO_REUSEPORT with SO_REUSEADDR), so ask the port first; reuse is
+	// still needed, since without it the connections of an app just quit, waiting out their
+	// last half minute (TIME_WAIT), keep the next instance from listening at all.
+	if (IsPortAnswering(ControlPort))
+	{
+		UE_LOG(LogStarControl, Warning, TEXT("Control service cannot listen on port %d: another app is listening there"), ControlPort);
+		return;
+	}
+	Listener = MakeShared<FTcpListener>(FIPv4Endpoint(FIPv4Address::Any, static_cast<uint16>(ControlPort)), FTimespan::FromMilliseconds(100), true);
 	Listener->OnConnectionAccepted().BindLambda([this](FSocket* Socket, const FIPv4Endpoint& From) {
 		Accepted.Enqueue(TPair<FSocket*, FString>(Socket, From.ToString()));
 		return true;
 	});
 	if (!Listener->IsActive())
 	{
-		UE_LOG(LogStarControl, Warning, TEXT("Control service cannot listen on port %d: taken by another process?"), ControlPort);
+		UE_LOG(LogStarControl, Warning, TEXT("Control service cannot listen on port %d"), ControlPort);
 		Listener.Reset();
 		return;
 	}

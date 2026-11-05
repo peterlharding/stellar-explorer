@@ -186,6 +186,10 @@ FString AStarActions::Perform(const StcVoiceCommand& Command, const FString& Hea
 	case STC_VOICE_LET_GO:
 		Pointer->Keep(INDEX_NONE);
 		return TEXT("Let go");
+	case STC_VOICE_HIDE_INFO:
+	case STC_VOICE_SHOW_INFO:
+		Pointer->SetInfoShown(Command.action == STC_VOICE_SHOW_INFO);
+		return Command.action == STC_VOICE_SHOW_INFO ? TEXT("Info shown") : TEXT("Info hidden");
 	case STC_VOICE_RETURN_TO_SUN:
 	{
 		// Home, and the Sun in view: SunViewParsecs from it, back along the way the head

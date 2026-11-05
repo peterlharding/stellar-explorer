@@ -12,7 +12,8 @@ class AStarPointer;
 /**
  * The named actions, one place for every way in: voice, the desktop console, and later the
  * panel and the settings screen. "Show" and "go to" a star by name, "go there" (to the star
- * kept or pointed at), "back off" and "closer" (from and to it), "return to the Sun", "let go".
+ * kept or pointed at), "back off" and "closer" (from and to it), "return to the Sun", "let go",
+ * "hide info" and "show info" (the panel describing the star).
  *
  * A command arrives as text, typed or heard, and the core (stc_voice_*) turns it into an
  * action and a star, from the catalogue's names and their spoken forms, which this actor

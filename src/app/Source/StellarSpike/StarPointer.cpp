@@ -8,6 +8,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Features/IModularFeatures.h"
+#include "GazePinch.h"
 #include "DesktopMouse.h"
 #include "Framework/Application/SlateApplication.h"
 #include "GameFramework/PlayerController.h"
@@ -81,6 +82,7 @@ namespace
 	constexpr int32 PartBody = 1;
 	constexpr int32 PartBar = 2;
 	constexpr int32 PartActions = 3;
+	constexpr int32 PartHide = 4;
 	/** The first item of the actions list; the others follow. */
 	constexpr int32 PartItem = 10;
 	// The grab bar under the panel, the "..." button above its right end, and the actions list
@@ -96,17 +98,27 @@ namespace
 	constexpr double MenuGap = 1.2;
 	constexpr double MenuPadding = 0.8;
 	constexpr double HitMargin = 0.6;
+	// The button that hides the panel, left of the bar, as a visionOS window's close button is,
+	// and how far from its centre a ray still counts.
+	constexpr double HideRadius = 0.8;
+	constexpr double HideGap = 1.6;
+	constexpr double HideReach = 2.0;
 	/** After a pinch on the panel, this long before the next: a pinch seen twice must not toggle twice. */
 	constexpr double PanelGateSeconds = 0.4;
 	/** How long a line shown by ShowNote stays. */
 	constexpr double NoteSeconds = 6.0;
-	/** The actions list: the commands that need no star's name, run through AStarActions. */
-	const TCHAR* const MenuLabels[] = {TEXT("Go there"), TEXT("Back off"), TEXT("Closer"), TEXT("Return to the Sun"), TEXT("Let go")};
+	/**
+	 * The actions list and the hand menu: the commands that need no star's name, run through
+	 * AStarActions. The last reads "Hide info" or "Show info", as the panel is (MenuLabel).
+	 */
+	const TCHAR* const MenuLabels[] = {TEXT("Go there"), TEXT("Back off"), TEXT("Closer"), TEXT("Return to the Sun"), TEXT("Let go"), TEXT("Hide info")};
 	constexpr int32 MenuCount = UE_ARRAY_COUNT(MenuLabels);
+	constexpr int32 InfoItem = MenuCount - 1;
 	constexpr double MenuHeight = MenuCount * ItemHeight + 2.0 * MenuPadding;
 	// Where they sit on the panel (right, up from its centre).
 	constexpr double BarUp = -PanelHeight / 2.0 - BarGap - BarHeight / 2.0;
 	constexpr double ButtonRight = PanelWidth / 2.0 - ButtonWidth / 2.0;
+	constexpr double HideRight = -BarWidth / 2.0 - HideGap - HideRadius;
 	constexpr double ButtonUp = PanelHeight / 2.0 + ButtonGap + ButtonHeight / 2.0;
 	constexpr double MenuRight = -PanelWidth / 2.0 - MenuGap - MenuWidth / 2.0;
 	constexpr double MenuTop = PanelHeight / 2.0;
@@ -133,6 +145,78 @@ namespace
 	constexpr double SmallestStep = 1.5;
 	/** A kept star further than this from straight ahead, across or up, gets directions on the panel. */
 	constexpr double InViewDegrees = 25.0;
+	/** In a headset the panel goes this long after it was last in use (a star pointed at or kept). */
+	constexpr double InfoIdleSeconds = 3.0;
+
+	// The hand menu, in centimetres. A button on the back of the wrist of the hand that does not
+	// point, shown while the back of that hand is towards the head, opens and closes it, touched
+	// with the pointing hand's index fingertip. (Not the palm: turned to the face, the palm brings
+	// up visionOS's own Home button, which leaves the app.) The menu is a column of buttons
+	// beside the wrist, towards the pointing hand, upright and facing the head; it stays where it
+	// opened, travelling with the viewer, so the hand can drop while the other presses.
+	constexpr double WristStandOff = 2.5;
+	constexpr double WristFacingDegrees = 60.0;
+	/** Only a hand this near the head, held up to look at, not one resting by the side. */
+	constexpr double WristReach = 70.0;
+	constexpr double WristRadius = 1.2;
+	/** The fingertip lights the button within WristNear, touches it within WristTouch, and must go beyond WristRearm before the next touch. */
+	constexpr double WristNear = 6.0;
+	constexpr double WristTouch = 2.0;
+	constexpr double WristRearm = 5.0;
+	/** Within this of the menu, the pointing hand presses it rather than pointing. */
+	constexpr double FingerAtMenu = 12.0;
+	constexpr double HandButtonWidth = 9.0;
+	constexpr double HandButtonHeight = 2.4;
+	constexpr double HandButtonGap = 0.5;
+	constexpr float HandTextSize = 0.8f;
+	constexpr double HandTextPadding = 0.8;
+	/** From the wrist button to the menu's centre: across by a gap and half the menu, and up alongside the hand. */
+	constexpr double HandMenuAcross = 3.0 + HandButtonWidth / 2.0;
+	constexpr double HandMenuRaise = 4.0;
+	constexpr double HandMenuHeight = MenuCount * HandButtonHeight + (MenuCount - 1) * HandButtonGap;
+	// The fingertip presses a button by passing through its plane, from in front of it, within
+	// it (and PokeMargin around); it lights the button from PokeHover in front. Another press
+	// needs the fingertip back in front by PokeRearm, and PokeGateSeconds since the last.
+	constexpr double PokeHover = 5.0;
+	constexpr double PokeBehind = 2.0;
+	constexpr double PokeMargin = 0.5;
+	constexpr double PokeRearm = 1.0;
+	constexpr double PokeGateSeconds = 0.5;
+	constexpr double PressedSeconds = 0.3;
+	/** The fingertip's dot shows within this of the menu, in front or to the side; its diameter grows with the distance in front. */
+	constexpr double FingerDotReach = 10.0;
+	constexpr double FingerDotSmallest = 0.4;
+	constexpr double FingerDotGrowth = 0.1;
+	/** Up from the hand menu's centre to an item's. */
+	constexpr double HandItemUp(int32 Item)
+	{
+		return HandMenuHeight / 2.0 - HandButtonHeight / 2.0 - Item * (HandButtonHeight + HandButtonGap);
+	}
+	// Under the hand menu, the bar that moves it and, to its left, the button that closes it, as
+	// under the panel; and how far from each a look or the fingertip still counts.
+	constexpr double HandBarWidth = 4.0;
+	constexpr double HandBarHeight = 0.4;
+	constexpr double HandBarGap = 1.0;
+	constexpr double HandBarReach = 0.8;
+	constexpr double HandHideRadius = 0.55;
+	constexpr double HandHideGap = 0.8;
+	constexpr double HandHideReach = 1.1;
+	constexpr double HandBarUp = -HandMenuHeight / 2.0 - HandBarGap - HandBarHeight / 2.0;
+	constexpr double HandHideRight = -HandBarWidth / 2.0 - HandHideGap - HandHideRadius;
+	/** The hand menu's parts after its items (AStarPointer::HandMenuPartAt). */
+	constexpr int32 HandPartBar = MenuCount;
+	constexpr int32 HandPartHide = MenuCount + 1;
+
+	// What a look-and-pinch moves with the hand, which takes it further than the hand goes by
+	// as much as it is further from the head, but never nearer or further than these.
+	constexpr int32 MoveNone = 0;
+	constexpr int32 MovePanel = 1;
+	constexpr int32 MoveHandMenu = 2;
+	constexpr double PanelNearest = 40.0;
+	constexpr double PanelFurthest = 250.0;
+	constexpr double HandMenuNearest = 20.0;
+	constexpr double HandMenuFurthest = 80.0;
+	constexpr double GazeEchoSeconds = 0.15;
 
 	// The colours as they are meant to look. The tonemapper washes bright colours out to
 	// white, so they are drawn at OverlayBrightness; and text colours are used as they are,
@@ -210,6 +294,32 @@ namespace
 		Frame->CreateMeshSection(0, Vertices, Triangles, NoNormals, NoUVs, NoColours, NoTangents, false);
 		Frame->SetCastShadow(false);
 		Frame->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	/** A cross, each arm Arm long from the centre, Thickness wide, in the panel's plane, each triangle in both windings. */
+	void BuildCross(UProceduralMeshComponent* Mesh, double Arm, double Thickness)
+	{
+		TArray<FVector> Vertices;
+		TArray<int32> Triangles;
+		const double Across = Thickness / 2.0 / UE_SQRT_2;
+		for (const double Slope : {1.0, -1.0})
+		{
+			// From bottom left to top right, then from top left to bottom right.
+			const FVector2D From(-Arm / UE_SQRT_2, -Slope * Arm / UE_SQRT_2);
+			const FVector2D Side(-Slope * Across, Across);
+			const int32 A = Vertices.Num();
+			Vertices.Append({OnPanel(From.X - Side.X, From.Y - Side.Y), OnPanel(-From.X - Side.X, -From.Y - Side.Y), OnPanel(-From.X + Side.X, -From.Y + Side.Y),
+				OnPanel(From.X + Side.X, From.Y + Side.Y)});
+			Triangles.Append({A, A + 1, A + 2, A, A + 2, A + 3});
+			Triangles.Append({A, A + 2, A + 1, A, A + 3, A + 2});
+		}
+		const TArray<FVector> NoNormals;
+		const TArray<FVector2D> NoUVs;
+		const TArray<FColor> NoColours;
+		const TArray<FProcMeshTangent> NoTangents;
+		Mesh->CreateMeshSection(0, Vertices, Triangles, NoNormals, NoUVs, NoColours, NoTangents, false);
+		Mesh->SetCastShadow(false);
+		Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
 
 	/** A filled rectangle Width by Height about the origin in the panel's plane, each triangle in both windings. */
@@ -303,6 +413,13 @@ AStarPointer::AStarPointer()
 	GrabBar = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("GrabBar"));
 	GrabBar->SetupAttachment(Panel);
 	GrabBar->SetRelativeLocation(OnPanel(0.0, BarUp));
+	HideRing = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("HideRing"));
+	HideRing->SetupAttachment(Panel);
+	HideRing->SetRelativeLocation(OnPanel(HideRight, BarUp));
+	HideRing->SetRelativeScale3D(FVector(HideRadius));
+	HideCross = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("HideCross"));
+	HideCross->SetupAttachment(Panel);
+	HideCross->SetRelativeLocation(OnPanel(HideRight, BarUp));
 	ActionsFrame = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("ActionsFrame"));
 	ActionsFrame->SetupAttachment(Panel);
 	ActionsFrame->SetRelativeLocation(OnPanel(ButtonRight, ButtonUp));
@@ -327,6 +444,51 @@ AStarPointer::AStarPointer()
 		Text->SetVerticalAlignment(EVRTA_TextCenter);
 		MenuItems.Add(Text);
 	}
+
+	HandMenu = CreateDefaultSubobject<USceneComponent>(TEXT("HandMenu"));
+	HandMenu->SetupAttachment(RootComponent);
+	WristButton = CreateDefaultSubobject<USceneComponent>(TEXT("WristButton"));
+	WristButton->SetupAttachment(RootComponent);
+	WristRing = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("WristRing"));
+	WristRing->SetupAttachment(WristButton);
+	WristRing->SetRelativeScale3D(FVector(WristRadius));
+	WristText = CreateDefaultSubobject<UTextRenderComponent>(TEXT("WristText"));
+	WristText->SetupAttachment(WristButton);
+	WristText->SetWorldSize(HandTextSize);
+	WristText->SetText(FText::FromString(TEXT("...")));
+	WristText->SetHorizontalAlignment(EHTA_Center);
+	WristText->SetVerticalAlignment(EVRTA_TextCenter);
+	WristButton->SetVisibility(false, true);
+	FingerDot = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("FingerDot"));
+	FingerDot->SetupAttachment(HandMenu);
+	FingerDot->SetCastShadow(false);
+	FingerDot->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HandMenu->SetVisibility(false, true);
+	for (int32 Item = 0; Item < MenuCount; ++Item)
+	{
+		UProceduralMeshComponent* Button = CreateDefaultSubobject<UProceduralMeshComponent>(*FString::Printf(TEXT("HandButton%d"), Item));
+		Button->SetupAttachment(HandMenu);
+		Button->SetRelativeLocation(OnPanel(0.0, HandItemUp(Item)));
+		HandFrames.Add(Button);
+		UTextRenderComponent* Text = CreateDefaultSubobject<UTextRenderComponent>(*FString::Printf(TEXT("HandItem%d"), Item));
+		Text->SetupAttachment(HandMenu);
+		Text->SetRelativeLocation(OnPanel(-HandButtonWidth / 2.0 + HandTextPadding, HandItemUp(Item)));
+		Text->SetWorldSize(HandTextSize);
+		Text->SetText(FText::FromString(MenuLabels[Item]));
+		Text->SetHorizontalAlignment(EHTA_Left);
+		Text->SetVerticalAlignment(EVRTA_TextCenter);
+		HandItems.Add(Text);
+	}
+	HandBar = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("HandBar"));
+	HandBar->SetupAttachment(HandMenu);
+	HandBar->SetRelativeLocation(OnPanel(0.0, HandBarUp));
+	HandHideRing = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("HandHideRing"));
+	HandHideRing->SetupAttachment(HandMenu);
+	HandHideRing->SetRelativeLocation(OnPanel(HandHideRight, HandBarUp));
+	HandHideRing->SetRelativeScale3D(FVector(HandHideRadius));
+	HandHideCross = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("HandHideCross"));
+	HandHideCross->SetupAttachment(HandMenu);
+	HandHideCross->SetRelativeLocation(OnPanel(HandHideRight, HandBarUp));
 }
 
 void AStarPointer::BeginPlay()
@@ -336,6 +498,9 @@ void AStarPointer::BeginPlay()
 
 	BuildRing(HoverRing);
 	BuildRing(SelectionRing);
+	BuildRing(WristRing);
+	WristMaterial = ColouredMaterial(FrameColour);
+	WristRing->SetMaterial(0, WristMaterial);
 	HoverRing->SetMaterial(0, ColouredMaterial(HoverColour));
 	SelectionRing->SetMaterial(0, ColouredMaterial(SelectionColour));
 	BuildFrame(Frame, PanelWidth, PanelHeight, FrameThickness);
@@ -344,10 +509,31 @@ void AStarPointer::BeginPlay()
 	BuildQuad(GrabBar, BarWidth, BarHeight);
 	GrabBarMaterial = ColouredMaterial(BarColour);
 	GrabBar->SetMaterial(0, GrabBarMaterial);
+	BuildRing(HideRing);
+	BuildCross(HideCross, HideRadius * 0.45, FrameThickness);
+	HideMaterial = ColouredMaterial(FrameColour);
+	HideRing->SetMaterial(0, HideMaterial);
+	HideCross->SetMaterial(0, HideMaterial);
 	BuildFrame(ActionsFrame, ButtonWidth, ButtonHeight, FrameThickness);
 	ActionsFrame->SetMaterial(0, ColouredMaterial(FrameColour));
 	BuildFrame(MenuFrame, MenuWidth, MenuHeight, FrameThickness);
 	MenuFrame->SetMaterial(0, ColouredMaterial(FrameColour));
+	// Thinner than the panel's frame, as the menu is nearer: about as thick to the eye.
+	for (UProceduralMeshComponent* Button : HandFrames)
+	{
+		BuildFrame(Button, HandButtonWidth, HandButtonHeight, FrameThickness / 2.0);
+		UMaterialInstanceDynamic* Material = ColouredMaterial(FrameColour);
+		Button->SetMaterial(0, Material);
+		HandFrameMaterials.Add(Material);
+	}
+	BuildQuad(HandBar, HandBarWidth, HandBarHeight);
+	HandBarMaterial = ColouredMaterial(BarColour);
+	HandBar->SetMaterial(0, HandBarMaterial);
+	BuildRing(HandHideRing);
+	BuildCross(HandHideCross, HandHideRadius * 0.45, FrameThickness / 2.0);
+	HandHideMaterial = ColouredMaterial(FrameColour);
+	HandHideRing->SetMaterial(0, HandHideMaterial);
+	HandHideCross->SetMaterial(0, HandHideMaterial);
 	if (UMaterialInterface* Text = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/M_Label.M_Label")))
 	{
 		Title->SetTextMaterial(Text);
@@ -359,10 +545,18 @@ void AStarPointer::BeginPlay()
 		{
 			Item->SetTextMaterial(Text);
 		}
+		for (UTextRenderComponent* Item : HandItems)
+		{
+			Item->SetTextMaterial(Text);
+		}
+		WristText->SetTextMaterial(Text);
 	}
 	UStaticMesh* Sphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	Dots->SetStaticMesh(Sphere);
 	Dots->SetMaterial(0, ColouredMaterial(DotColour));
+	FingerDot->SetStaticMesh(Sphere);
+	FingerDotMaterial = ColouredMaterial(DotColour);
+	FingerDot->SetMaterial(0, FingerDotMaterial);
 	for (int32 Dot = 0; Dot < DotCount; ++Dot)
 	{
 		Dots->AddInstance(FTransform::Identity, true);
@@ -381,6 +575,7 @@ void AStarPointer::BeginPlay()
 	FParse::Value(FCommandLine::Get(), TEXT("RightTriggerKey="), RightTriggerKey);
 	FParse::Value(FCommandLine::Get(), TEXT("LeftTriggerKey="), LeftTriggerKey);
 	bLogInput = FParse::Param(FCommandLine::Get(), TEXT("LogInput"));
+	bShowControls = FParse::Param(FCommandLine::Get(), TEXT("PanelControls"));
 	if (!bHeadset)
 	{
 		Pointer = MouseHand;
@@ -444,6 +639,11 @@ TArray<AStarPointer::FRay, TInlineAllocator<2>> AStarPointer::GetRays(const FVec
 		}
 		return Rays;
 	}
+	// Set again below for each hand tracked as a hand this frame.
+	for (FHand& State : Hands)
+	{
+		State.bHandTracked = false;
+	}
 	// Prefer motion controllers when one is tracked (the Vive); otherwise hand tracking (the Vision
 	// Pro). The Vive's runtime reports a valid hand tracker even with controllers in use, so the
 	// controller check comes first. Gated to Windows because on the Vision Pro the aim pose comes
@@ -496,6 +696,20 @@ TArray<AStarPointer::FRay, TInlineAllocator<2>> AStarPointer::GetRays(const FVec
 		const double Gap = FVector::Distance(Joints[int32(EHandKeypoint::ThumbTip)], Joints[int32(EHandKeypoint::IndexTip)]);
 		const bool bWasPinched = State.bPinched;
 		State.bSeenOpen |= Gap > OpenGap;
+		// For the hand menu: out of the palm is across the knuckles, little to index, crossed
+		// with up the hand, wrist to middle knuckle; the other way round for the right hand.
+		State.bHandTracked = true;
+		State.IndexTip = Joints[int32(EHandKeypoint::IndexTip)];
+		State.Palm = Through;
+		State.Gap = Gap;
+		const FVector& Wrist = Joints[int32(EHandKeypoint::Wrist)];
+		State.Wrist = Wrist;
+		const FVector& Middle = Joints[int32(EHandKeypoint::MiddleProximal)];
+		const FVector& Index = Joints[int32(EHandKeypoint::IndexProximal)];
+		const FVector& Little = Joints[int32(EHandKeypoint::LittleProximal)];
+		const bool bJoints = !Wrist.IsNearlyZero() && !Middle.IsNearlyZero() && !Index.IsNearlyZero() && !Little.IsNearlyZero();
+		State.PalmNormal = bJoints ? (FVector::CrossProduct(Middle - Wrist, Little - Index) * (Hand == EControllerHand::Left ? 1.0 : -1.0)).GetSafeNormal()
+								   : FVector::ZeroVector;
 		if (State.bPinched)
 		{
 			State.PinchClosest = FMath::Min(State.PinchClosest, Gap);
@@ -642,6 +856,8 @@ void AStarPointer::Tick(float DeltaSeconds)
 
 	const TArray<FRay, TInlineAllocator<2>> Rays = GetRays(Head, HeadRotation);
 	const double Now = GetWorld()->GetRealTimeSeconds();
+	UpdateHandMenu(Head, HeadRotation, DeltaSeconds);
+	UseGazePinches(Head);
 	Hovered = INDEX_NONE;
 	Aimed = PartNone;
 	int32 Pinched = 0;
@@ -651,8 +867,9 @@ void AStarPointer::Tick(float DeltaSeconds)
 	{
 		FHand& State = Hands[Ray.Hand];
 		Pinched += Ray.bPinched ? 1 : 0;
-		// The other hand only counts towards the gesture that quits.
-		if (Ray.Hand != Pointer)
+		// The other hand only counts towards the gesture that quits; and at the hand menu or its
+		// wrist button the pointing hand presses them, so it neither points nor pinches.
+		if (Ray.Hand != Pointer || bFingerAtMenu)
 		{
 			State.bWasPinched = Ray.bPinched;
 			continue;
@@ -842,14 +1059,23 @@ int32 AStarPointer::HitPanel(const FVector& Origin, const FVector& Direction, do
 			return PartBody;
 		}
 	}
-	if (Within(ButtonRight, ButtonUp, ButtonWidth, ButtonHeight, HitMargin))
+	if (ActionsFrame->IsVisible() && Within(ButtonRight, ButtonUp, ButtonWidth, ButtonHeight, HitMargin))
 	{
 		return PartActions;
+	}
+	// Hidden, the panel and its bar let the ray through to the stars.
+	if (!bInfoVisible)
+	{
+		return PartNone;
 	}
 	// The bar is thin: it counts for more than its height, as a visionOS window's does.
 	if (Within(0.0, BarUp, BarWidth, BarHeight * 3.0, HitMargin))
 	{
 		return PartBar;
+	}
+	if (HideRing->IsVisible() && Within(HideRight, BarUp, 0.0, 0.0, HideReach))
+	{
+		return PartHide;
 	}
 	return Within(0.0, 0.0, PanelWidth, PanelHeight, 0.0) ? PartBody : PartNone;
 }
@@ -866,14 +1092,396 @@ void AStarPointer::PressPanel(int32 Part, const FVector& Origin, const FVector& 
 	{
 		bMenuOpen = !bMenuOpen;
 	}
+	else if (Part == PartHide)
+	{
+		RunMenuItem(InfoItem);
+	}
 	else if (Part >= PartItem && Part < PartItem + MenuCount)
 	{
 		bMenuOpen = false;
-		const FString Command = MenuLabels[Part - PartItem];
-		const FString Result = Actions != nullptr ? Actions->Run(Command) : FString(TEXT("No actions"));
-		UE_LOG(LogStarPointer, Display, TEXT("Panel list: \"%s\": %s"), *Command, *Result);
-		ShowNote(Result);
+		RunMenuItem(Part - PartItem);
 	}
+}
+
+FString AStarPointer::MenuLabel(int32 Item) const
+{
+	return Item == InfoItem ? FString(bInfoShown ? TEXT("Hide info") : TEXT("Show info")) : FString(MenuLabels[Item]);
+}
+
+void AStarPointer::RunMenuItem(int32 Item)
+{
+	const FString Command = MenuLabel(Item);
+	const FString Result = Actions != nullptr ? Actions->Run(Command) : FString(TEXT("No actions"));
+	UE_LOG(LogStarPointer, Display, TEXT("Menu: \"%s\": %s"), *Command, *Result);
+	ShowNote(Result);
+}
+
+void AStarPointer::SetInfoShown(bool bShown)
+{
+	bInfoShown = bShown;
+	// Shown, it stays for a while even with nothing pointed at, to be seen to be back.
+	LastInUse = GetWorld()->GetRealTimeSeconds();
+	UE_LOG(LogStarPointer, Display, TEXT("Info %s"), bShown ? TEXT("shown") : TEXT("hidden"));
+}
+
+void AStarPointer::UpdateHandMenu(const FVector& Head, const FRotator& HeadRotation, float DeltaSeconds)
+{
+	const double Now = GetWorld()->GetRealTimeSeconds();
+	const FQuat Facing = HeadRotation.Quaternion();
+	// Beside the wrist, towards the pointing hand: to its right for a left hand.
+	const double Side = Pointer == 0 ? -1.0 : 1.0;
+	const APlayerController* Player = GetWorld()->GetFirstPlayerController();
+	const APawn* Pawn = Player != nullptr ? Player->GetPawn() : nullptr;
+	const FVector Base = Pawn != nullptr ? Pawn->GetActorLocation() : FVector::ZeroVector;
+	const bool bHands = bHeadset && Pointer != MouseHand && !bUsingControllers;
+	const FHand& Other = Hands[bHands ? 1 - Pointer : 0];
+	const FHand& Finger = Hands[bHands ? Pointer : 1];
+	bFingerAtMenu = false;
+	// Upright to the world in a headset, not to the head, which tilts to look down at the wrist
+	// and would tilt the menu with it; on the desktop, to the view, which may be rolled.
+	const FVector Upright = bHeadset ? FVector::UpVector : Facing.GetUpVector();
+
+	// The wrist button, standing off the back of the wrist, while the back of the hand is towards the head.
+	bool bButton = false;
+	FVector ButtonPlace = FVector::ZeroVector;
+	if (bHands && Other.bHandTracked && !Other.PalmNormal.IsZero() && !Other.Wrist.IsNearlyZero())
+	{
+		ButtonPlace = Other.Wrist - Other.PalmNormal * WristStandOff;
+		const FVector ToHead = Head - ButtonPlace;
+		bButton = ToHead.Size() < WristReach &&
+			FVector::DotProduct(-Other.PalmNormal, ToHead.GetSafeNormal()) >= FMath::Cos(FMath::DegreesToRadians(WristFacingDegrees));
+	}
+	else if (bShowControls && !bHeadset)
+	{
+		// To check the layout on the desktop: where a left wrist held up would put them.
+		bButton = true;
+		ButtonPlace = Head + Facing.RotateVector(FVector(45.0, -20.0 - HandMenuAcross, -4.0 - HandMenuRaise));
+	}
+	WristButton->SetVisibility(bButton, true);
+	bool bWristAimed = false;
+	if (bButton)
+	{
+		WristButton->SetWorldLocationAndRotation(ButtonPlace, FRotationMatrix::MakeFromXZ(Head - ButtonPlace, Upright).ToQuat());
+		if (bHeadset && Finger.bHandTracked)
+		{
+			const double Distance = FVector::Distance(Finger.IndexTip, ButtonPlace);
+			bWristAimed = Distance < WristNear;
+			bFingerAtMenu |= bWristAimed;
+			if (bWristArmed && Distance < WristTouch && Now >= PokeGateUntil)
+			{
+				bWristArmed = false;
+				PokeGateUntil = Now + PokeGateSeconds;
+				if (bHandMenuShown)
+				{
+					CloseHandMenu();
+				}
+				else
+				{
+					// Fixed where it opens, relative to the viewer, who may travel with it open.
+					// Across as the head sees it, level, and up to the world.
+					const FVector Across = FRotationMatrix::MakeFromXZ(ButtonPlace - Head, Upright).GetUnitAxis(EAxis::Y);
+					const FVector Place = ButtonPlace + Across * Side * HandMenuAcross + Upright * HandMenuRaise;
+					HandMenuFromViewer = Place - Base;
+					HandMenuRotation = FRotationMatrix::MakeFromXZ(Head - Place, Upright).ToQuat();
+					bHandMenuShown = true;
+					bPokeArmed = false;
+					FingerNearest = TNumericLimits<double>::Max();
+					FingerFrames = 0;
+					UE_LOG(LogStarPointer, Display, TEXT("Hand menu opened, %.0f cm from the head"), FVector::Distance(Head, Place));
+				}
+			}
+			bWristArmed |= Distance > WristRearm;
+		}
+		else
+		{
+			bWristArmed = false;
+		}
+	}
+	else
+	{
+		// Shown again, the fingertip may already be on it: that is not a touch.
+		bWristArmed = false;
+	}
+	if (WristMaterial != nullptr)
+	{
+		WristMaterial->SetVectorParameterValue(TEXT("Colour"), (bWristAimed || bHandMenuShown ? SelectionColour : FrameColour) * OverlayBrightness);
+	}
+	WristText->SetTextRenderColor(((bWristAimed || bHandMenuShown ? SelectionColour : DetailsColour) * OverlayBrightness).ToFColor(false));
+
+	// Controllers came, or the hands went to the desktop: no menu to press.
+	if (bHandMenuShown && !bHands)
+	{
+		CloseHandMenu();
+	}
+	const bool bShow = bHandMenuShown || (bShowControls && !bHeadset);
+	HandMenu->SetVisibility(bShow, true);
+	FingerDot->SetVisibility(false);
+	HandAimed = INDEX_NONE;
+	if (!bShow)
+	{
+		return;
+	}
+	if (bHandMenuShown)
+	{
+		HandMenu->SetWorldLocationAndRotation(Base + HandMenuFromViewer, HandMenuRotation);
+	}
+	else
+	{
+		const FVector Place = Head + Facing.RotateVector(FVector(45.0, -20.0, -4.0));
+		HandMenu->SetWorldLocationAndRotation(Place, FRotationMatrix::MakeFromXZ(Head - Place, Facing.GetUpVector()).ToQuat());
+	}
+
+	// The pointing finger: in the menu's frame, in front (towards the head) is +X, right is -Y.
+	if (bHeadset && Finger.bHandTracked)
+	{
+		const FVector Tip = HandMenu->GetComponentTransform().InverseTransformPosition(Finger.IndexTip);
+		const double Depth = Tip.X;
+		const double Right = -Tip.Y;
+		const double Up = Tip.Z;
+		const int32 Under = HandMenuPartAt(Right, Up, PokeMargin);
+		if (Under != INDEX_NONE && Depth <= PokeHover && Depth >= -PokeBehind)
+		{
+			HandAimed = Under;
+		}
+		// How far the fingertip is from the menu's buttons, for the log.
+		const double Across = FMath::Max(FMath::Abs(Right) - HandButtonWidth / 2.0, 0.0);
+		const double Along = FMath::Max(FMath::Max(Up - HandMenuHeight / 2.0, HandBarUp - Up), 0.0);
+		const double Nearest = FMath::Sqrt(Depth * Depth + Across * Across + Along * Along);
+		++FingerFrames;
+		bFingerAtMenu |= Nearest < FingerAtMenu;
+		if (Nearest < FingerNearest)
+		{
+			FingerNearest = Nearest;
+			FingerNearestAt = FVector(Depth, Right, Up);
+		}
+		// The dot under the fingertip, on the menu's plane, a little in front of it so the frames do not hide it.
+		if (Across <= FingerDotReach && Along <= FingerDotReach && Depth >= -PokeBehind && Depth <= FingerDotReach)
+		{
+			const double Diameter = FingerDotSmallest + FingerDotGrowth * FMath::Max(Depth, 0.0);
+			FingerDot->SetRelativeLocation(FVector(0.05, Tip.Y, Tip.Z));
+			// The basic sphere is 100 units across.
+			FingerDot->SetRelativeScale3D(FVector(Diameter / 100.0));
+			FingerDot->SetVisibility(true);
+			if (FingerDotMaterial != nullptr)
+			{
+				FingerDotMaterial->SetVectorParameterValue(TEXT("Colour"), (HandAimed != INDEX_NONE ? SelectionColour : DotColour) * OverlayBrightness);
+			}
+		}
+		// The bar is for moving the menu by look-and-pinch: a poke on it does nothing.
+		if (bPokeArmed && PokeDepth > 0.0 && Depth <= 0.0 && Depth >= -PokeBehind && Under != INDEX_NONE && Under != HandPartBar && Now >= PokeGateUntil)
+		{
+			UE_LOG(LogStarPointer, Display, TEXT("Hand menu pressed: item %d"), Under);
+			bPokeArmed = false;
+			PokeGateUntil = Now + PokeGateSeconds;
+			if (Under == HandPartHide)
+			{
+				CloseHandMenu();
+			}
+			else
+			{
+				HandPressed = Under;
+				HandPressedUntil = Now + PressedSeconds;
+				RunMenuItem(Under);
+			}
+		}
+		bPokeArmed |= Depth > PokeRearm;
+		PokeDepth = Depth;
+	}
+	else
+	{
+		// Seen again, the fingertip may already be behind the menu: that is not a press.
+		bPokeArmed = false;
+	}
+	for (int32 Item = 0; Item < MenuCount; ++Item)
+	{
+		const bool bPressed = Item == HandPressed && Now < HandPressedUntil;
+		HandItems[Item]->SetText(FText::FromString(MenuLabel(Item)));
+		HandItems[Item]->SetTextRenderColor(((Item == HandAimed || bPressed ? SelectionColour : DetailsColour) * OverlayBrightness).ToFColor(false));
+		if (HandFrameMaterials.IsValidIndex(Item) && HandFrameMaterials[Item] != nullptr)
+		{
+			HandFrameMaterials[Item]->SetVectorParameterValue(TEXT("Colour"), (bPressed ? SelectionColour : FrameColour) * OverlayBrightness);
+		}
+	}
+	if (HandBarMaterial != nullptr)
+	{
+		HandBarMaterial->SetVectorParameterValue(TEXT("Colour"), (HandAimed == HandPartBar || GazeMoving == MoveHandMenu ? SelectionColour : BarColour) * OverlayBrightness);
+	}
+	if (HandHideMaterial != nullptr)
+	{
+		HandHideMaterial->SetVectorParameterValue(TEXT("Colour"), (HandAimed == HandPartHide ? SelectionColour : FrameColour) * OverlayBrightness);
+	}
+}
+
+int32 AStarPointer::HandMenuPartAt(double Right, double Up, double Margin) const
+{
+	if (FMath::Abs(Right) <= HandButtonWidth / 2.0 + Margin)
+	{
+		for (int32 Item = 0; Item < MenuCount; ++Item)
+		{
+			if (FMath::Abs(Up - HandItemUp(Item)) <= (HandButtonHeight + HandButtonGap) / 2.0 + (Item == 0 || Item == MenuCount - 1 ? Margin : 0.0))
+			{
+				return Item;
+			}
+		}
+	}
+	if (FMath::Abs(Up - HandBarUp) <= HandBarReach && FMath::Abs(Right) <= HandBarWidth / 2.0 + Margin)
+	{
+		return HandPartBar;
+	}
+	if (FMath::Abs(Up - HandBarUp) <= HandHideReach && FMath::Abs(Right - HandHideRight) <= HandHideReach)
+	{
+		return HandPartHide;
+	}
+	return INDEX_NONE;
+}
+
+void AStarPointer::UseGazePinches(const FVector& Head)
+{
+	if (!bHeadset)
+	{
+		return;
+	}
+	if (!bGazeListening)
+	{
+		bGazeListening = GazePinch::Listen();
+	}
+	const double Now = GetWorld()->GetRealTimeSeconds();
+	const APlayerController* Player = GetWorld()->GetFirstPlayerController();
+	const APawn* Pawn = Player != nullptr ? Player->GetPawn() : nullptr;
+	const FVector Base = Pawn != nullptr ? Pawn->GetActorLocation() : FVector::ZeroVector;
+	for (const GazePinch::FEvent& Event : GazePinch::Take())
+	{
+		// The pinch moving the panel or the hand menu: it follows the hand until the pinch ends.
+		if (Event.Phase != GazePinch::EPhase::Began)
+		{
+			if (GazeMoving == MoveNone || Event.Id != GazeMovingId)
+			{
+				continue;
+			}
+			if (Event.Phase == GazePinch::EPhase::Ended)
+			{
+				UE_LOG(LogStarPointer, Display, TEXT("Look and pinch: %s put down %.0f cm from the head"), GazeMoving == MovePanel ? TEXT("panel") : TEXT("hand menu"),
+					FVector::Distance(Head, GazeMoving == MovePanel ? Panel->GetComponentLocation() : HandMenu->GetComponentLocation()));
+				GazeMoving = MoveNone;
+				continue;
+			}
+			if (!Event.bHasHand)
+			{
+				continue;
+			}
+			const FVector Offset = GazeMoveFrom + (Event.Hand - GazeHandFrom) * GazeMoveGain - Head;
+			const bool bPanel = GazeMoving == MovePanel;
+			const double Distance = FMath::Clamp(Offset.Size(), bPanel ? PanelNearest : HandMenuNearest, bPanel ? PanelFurthest : HandMenuFurthest);
+			const FVector Place = Head + Offset.GetSafeNormal() * Distance;
+			if (bPanel)
+			{
+				PanelPlace = PanelRotation.UnrotateVector(Place - Head);
+			}
+			else
+			{
+				HandMenuFromViewer = Place - Base;
+				HandMenuRotation = FRotationMatrix::MakeFromXZ(Head - Place, FVector::UpVector).ToQuat();
+			}
+			continue;
+		}
+		if (!Event.bHasRay)
+		{
+			UE_LOG(LogStarPointer, Display, TEXT("Look and pinch: the pinch came without where the eyes were"));
+			continue;
+		}
+		// A pinch reported twice, or one hand's while the other moves something.
+		if (Now < GazeEchoUntil || GazeMoving != MoveNone)
+		{
+			UE_LOG(LogStarPointer, Display, TEXT("Look and pinch: ignored, %s"), GazeMoving != MoveNone ? TEXT("moving") : TEXT("too soon after the last"));
+			continue;
+		}
+		GazeEchoUntil = Now + GazeEchoSeconds;
+		// The pointing hand's own pinch, seen through hand tracking too, is not to act again.
+		GateUntil = FMath::Max(GateUntil, Now + PanelGateSeconds);
+
+		// The hand menu first, as it is nearest, then the panel, then the stars. The hand menu's
+		// part is where the look meets its plane, from in front.
+		int32 HandPart = INDEX_NONE;
+		if (bHandMenuShown)
+		{
+			const FTransform& Menu = HandMenu->GetComponentTransform();
+			const FVector From = Menu.InverseTransformPosition(Event.Origin);
+			const FVector Towards = Menu.InverseTransformVectorNoScale(Event.Direction);
+			if (Towards.X < -UE_KINDA_SMALL_NUMBER)
+			{
+				const FVector Hit = From + Towards * (-From.X / Towards.X);
+				HandPart = HandMenuPartAt(-Hit.Y, Hit.Z, PokeMargin);
+			}
+		}
+		double Along = 0.0;
+		const int32 Part = HandPart == INDEX_NONE ? HitPanel(Event.Origin, Event.Direction, Along) : PartNone;
+		const auto StartMoving = [&](int32 What, const FVector& From, const TCHAR* Name) {
+			if (!Event.bHasHand)
+			{
+				UE_LOG(LogStarPointer, Display, TEXT("Look and pinch: the %s, but the pinch came without its hand, to move it by"), Name);
+				return;
+			}
+			GazeMoving = What;
+			GazeMovingId = Event.Id;
+			GazeMoveFrom = From;
+			GazeHandFrom = Event.Hand;
+			GazeMoveGain = FMath::Max(1.0, FVector::Distance(Head, From) / FMath::Max(FVector::Distance(Head, Event.Hand), 1.0));
+			UE_LOG(LogStarPointer, Display, TEXT("Look and pinch: moving the %s, %.1f times as far as the hand"), Name, GazeMoveGain);
+		};
+		if (HandPart != INDEX_NONE && HandPart < MenuCount)
+		{
+			UE_LOG(LogStarPointer, Display, TEXT("Look and pinch: hand menu item %d"), HandPart);
+			HandPressed = HandPart;
+			HandPressedUntil = Now + PressedSeconds;
+			RunMenuItem(HandPart);
+		}
+		else if (HandPart == HandPartHide)
+		{
+			UE_LOG(LogStarPointer, Display, TEXT("Look and pinch: the hand menu's close button"));
+			CloseHandMenu();
+		}
+		else if (HandPart == HandPartBar)
+		{
+			StartMoving(MoveHandMenu, HandMenu->GetComponentLocation(), TEXT("hand menu"));
+		}
+		else if (Part == PartBar || Part == PartBody)
+		{
+			StartMoving(MovePanel, Panel->GetComponentLocation(), TEXT("panel"));
+		}
+		else if (Part != PartNone)
+		{
+			UE_LOG(LogStarPointer, Display, TEXT("Look and pinch: the panel's part %d"), Part);
+			PressPanel(Part, Event.Origin, Event.Direction, Along);
+		}
+		else
+		{
+			const int32 Star = StarField->FindStar(Event.Origin, Event.Direction, MaxPointingAngleDegrees);
+			UE_LOG(LogStarPointer, Display, TEXT("Look and pinch: %s"), Star != INDEX_NONE ? *StarField->GetName(Star) : TEXT("no star"));
+			if (Star != INDEX_NONE)
+			{
+				Select(Star);
+				LastInUse = Now;
+			}
+		}
+	}
+}
+
+void AStarPointer::CloseHandMenu()
+{
+	bHandMenuShown = false;
+	if (GazeMoving == MoveHandMenu)
+	{
+		GazeMoving = MoveNone;
+	}
+	// Where the fingertip went, in the menu's frame (in front, right, up, in cm), to tell a press
+	// that missed from one never tried.
+	if (FingerFrames == 0)
+	{
+		UE_LOG(LogStarPointer, Display, TEXT("Hand menu closed; the pointing hand was not tracked while it was open"));
+		return;
+	}
+	UE_LOG(LogStarPointer, Display, TEXT("Hand menu closed; the fingertip came within %.1f cm of it, at %.1f in front, %.1f right, %.1f up (%d frames tracked)"),
+		FingerNearest, FingerNearestAt.X, FingerNearestAt.Y, FingerNearestAt.Z, FingerFrames);
 }
 
 void AStarPointer::ShowNote(const FString& Text)
@@ -1110,23 +1718,45 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 	const FVector Place = Head + PanelRotation.RotateVector(PanelPlace);
 	Panel->SetWorldLocationAndRotation(Place, FRotationMatrix::MakeFromXZ(Head - Place, PanelRotation.GetUpVector()).ToQuat());
 
+	// In a headset the panel goes a while after it was last in use, and "Hide info" hides it
+	// until "Show info"; it shows the countdown to quitting whatever.
+	const double Now = GetWorld()->GetRealTimeSeconds();
+	if (!bPointingStarted || Hovered != INDEX_NONE || Selected != INDEX_NONE || Aimed != PartNone || bCarrying || bMenuOpen || GazeMoving == MovePanel)
+	{
+		LastInUse = Now;
+	}
+	bInfoVisible = BothPinchedSeconds > 0.0 || (bInfoShown && (!bHeadset || Now - LastInUse < InfoIdleSeconds));
+	Frame->SetVisibility(bInfoVisible);
+	Title->SetVisibility(bInfoVisible);
+	Details->SetVisibility(bInfoVisible);
+	Hint->SetVisibility(bInfoVisible);
+
 	// The bar, the button and the list: brighter under the ray, and only in a headset (or on
-	// the desktop with -PanelControls, the list open, to check their layout).
-	static const bool bShowControls = FParse::Param(FCommandLine::Get(), TEXT("PanelControls"));
-	const bool bControls = bHeadset || bShowControls;
-	const bool bList = (bHeadset && bMenuOpen) || bShowControls;
-	GrabBar->SetVisibility(bControls);
-	ActionsFrame->SetVisibility(bControls);
-	ActionsText->SetVisibility(bControls);
+	// the desktop with -PanelControls, the list open, to check their layout). The button and its
+	// list are for controllers, which have no hand menu, and stay with the panel hidden, to
+	// show it again from.
+	const bool bButton = (bHeadset && bUsingControllers) || bShowControls;
+	const bool bList = (bButton && bMenuOpen) || bShowControls;
+	bMenuOpen &= bButton;
+	GrabBar->SetVisibility((bHeadset || bShowControls) && bInfoVisible);
+	HideRing->SetVisibility(GrabBar->IsVisible());
+	HideCross->SetVisibility(GrabBar->IsVisible());
+	ActionsFrame->SetVisibility(bButton);
+	ActionsText->SetVisibility(bButton);
 	MenuFrame->SetVisibility(bList);
 	if (GrabBarMaterial != nullptr)
 	{
-		GrabBarMaterial->SetVectorParameterValue(TEXT("Colour"), (Aimed == PartBar || bCarrying ? SelectionColour : BarColour) * OverlayBrightness);
+		GrabBarMaterial->SetVectorParameterValue(TEXT("Colour"), (Aimed == PartBar || bCarrying || GazeMoving == MovePanel ? SelectionColour : BarColour) * OverlayBrightness);
+	}
+	if (HideMaterial != nullptr)
+	{
+		HideMaterial->SetVectorParameterValue(TEXT("Colour"), (Aimed == PartHide ? SelectionColour : FrameColour) * OverlayBrightness);
 	}
 	ActionsText->SetTextRenderColor(((Aimed == PartActions || bMenuOpen ? SelectionColour : DetailsColour) * OverlayBrightness).ToFColor(false));
 	for (int32 Item = 0; Item < MenuItems.Num(); ++Item)
 	{
 		MenuItems[Item]->SetVisibility(bList);
+		MenuItems[Item]->SetText(FText::FromString(MenuLabel(Item)));
 		MenuItems[Item]->SetTextRenderColor(((Aimed == PartItem + Item ? SelectionColour : DetailsColour) * OverlayBrightness).ToFColor(false));
 	}
 
@@ -1159,7 +1789,8 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 	Hint->SetText(FText::FromString(!bPointingStarted ? (bUsingControllers ? TEXT("Then pull the trigger again to keep a star") : TEXT("Then pinch again to keep a star"))
 			: !bHeadset                             ? TEXT("Click a star to keep it; drag to look")
 			: bUsingControllers                     ? TEXT("Pull the trigger to keep a star, both to exit")
-													: TEXT("Pinch to keep a star, both hands to exit")));
+			: Pointer == 0                          ? TEXT("Pinch to keep a star; right wrist: menu")
+													: TEXT("Pinch to keep a star; left wrist: menu")));
 	if (Hovered != INDEX_NONE)
 	{
 		ShowStar(Hovered, HoverColour);
@@ -1170,7 +1801,7 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 													: TEXT("Move over a star")));
 	Title->SetTextRenderColor((HintColour * OverlayBrightness).ToFColor(false));
 	// With nothing to describe, the build, so a session can be matched to its code.
-	Details->SetText(FText::FromString(FString::Printf(TEXT("Version %s, build %s\n%s, %s"), *StellarVersion(), STELLAR_SPIKE_COMMIT, STELLAR_SPIKE_BRANCH, STELLAR_SPIKE_BUILT)));
+	Details->SetText(FText::FromString(FString::Printf(TEXT("v%s, build %s\n%s, %s"), *StellarVersion(), *StellarShortCommit(), STELLAR_SPIKE_BRANCH, STELLAR_SPIKE_BUILT)));
 }
 
 void AStarPointer::ShowStar(int32 Star, const FLinearColor& Colour)

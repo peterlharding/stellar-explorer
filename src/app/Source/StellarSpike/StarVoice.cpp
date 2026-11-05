@@ -23,7 +23,8 @@ namespace
 	constexpr double WakeWaitSeconds = 3.0;
 
 	/** Spoken without a star's name, so worth biasing the recogniser towards too. */
-	const TCHAR* const CommandPhrases[] = {TEXT("Show"), TEXT("Go to"), TEXT("Go there"), TEXT("Back off"), TEXT("Closer"), TEXT("Return to the Sun"), TEXT("Let go")};
+	const TCHAR* const CommandPhrases[] = {TEXT("Show"), TEXT("Go to"), TEXT("Go there"), TEXT("Back off"), TEXT("Closer"), TEXT("Return to the Sun"), TEXT("Let go"),
+		TEXT("Hide info"), TEXT("Show info")};
 }
 
 AStarVoice::AStarVoice()
@@ -225,9 +226,19 @@ void AStarVoice::Tick(float DeltaSeconds)
 			LastText = Heard.Text;
 			LastChange = Now;
 			bActed = false;
-			// Show the words as they come only once the wake word is among them.
+			// Show the words as they come only once the wake word is among them, and note when
+			// the command in them last changed.
 			StcVoiceCommand Command;
-			if (Voice != nullptr && stc_voice_parse(Voice, TCHAR_TO_UTF8(*LastText), TCHAR_TO_UTF8(*WakeWord), &Command) >= 0 && Command.woken != 0)
+			const bool bWoken = Voice != nullptr && stc_voice_parse(Voice, TCHAR_TO_UTF8(*LastText), TCHAR_TO_UTF8(*WakeWord), &Command) >= 0 && Command.woken != 0;
+			const int32 Action = bWoken ? Command.action : STC_VOICE_NONE;
+			const int64 Star = bWoken ? Command.star_id : -1;
+			if (Action != LastAction || Star != LastStar)
+			{
+				LastAction = Action;
+				LastStar = Star;
+				CommandSince = Now;
+			}
+			if (bWoken)
 			{
 				ShowLine(FString::Printf(TEXT("\"%s\""), *LastText), true, 0.0);
 			}
@@ -247,6 +258,16 @@ void AStarVoice::Tick(float DeltaSeconds)
 	// "Stellar" was often followed by a pause), or a star's name that matches nothing yet
 	// (Apple's recogniser writes "Siri" first and corrects it to "Sirius" a moment later).
 	// Whatever is acted on or ignored, the next utterance starts afresh.
+	// But a complete command is acted on once it has stood a moment, though words go on: in a
+	// room with other people talking the words may not stop for a long time.
+	const bool bNamed = LastAction == STC_VOICE_SHOW || LastAction == STC_VOICE_GO_TO;
+	const bool bComplete = LastAction != STC_VOICE_NONE && (!bNamed || LastStar >= 0);
+	if (bWakeWord && !bTalking && !bAwaitingFinal && !bActed && bComplete && Now - CommandSince > (bNamed ? WakePauseSeconds : CommandPauseSeconds))
+	{
+		bActed = true;
+		Handle(LastText, true, CommandSince);
+		NextUtterance();
+	}
 	if (bWakeWord && !bTalking && !bAwaitingFinal && !bActed && !LastText.IsEmpty() && Now - LastChange > WakePauseSeconds)
 	{
 		StcVoiceCommand Command;
@@ -301,6 +322,8 @@ void AStarVoice::NextUtterance()
 {
 	LastText.Reset();
 	bActed = false;
+	LastAction = STC_VOICE_NONE;
+	LastStar = -1;
 	if (bWakeWord)
 	{
 		Recognizer->Restart();

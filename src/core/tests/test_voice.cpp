@@ -107,6 +107,13 @@ int main()
 	expect(voice, "galactic north", VoiceAction::AlignGalactic, -1);
 	expect(voice, "celestial north", VoiceAction::AlignCelestial, -1);
 
+	// The panel describing the star, hidden and shown; "show" alone still names a star.
+	expect(voice, "Stellar hide info", VoiceAction::HideInfo, -1);
+	expect(voice, "hide the panel", VoiceAction::HideInfo, -1);
+	expect(voice, "Stellar show info", VoiceAction::ShowInfo, -1);
+	expect(voice, "show details please", VoiceAction::ShowInfo, -1);
+	expect(voice, "show Sirius", VoiceAction::Show, 32264);
+
 	// Not close enough to anything.
 	expect(voice, "go to the Pleiades", VoiceAction::GoTo, -1); // not Paradys, which sounds a consonant away
 	expect(voice, "what a lovely evening", VoiceAction::None, -1);
