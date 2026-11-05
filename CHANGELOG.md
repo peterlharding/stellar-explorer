@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-05
+
+See [release_notes/v0.2.0.md](release_notes/v0.2.0.md) for details.
+
 ### Added
 
 - On the Vision Pro, a hand menu: touch the button on the back of the other hand's wrist with the pointing hand's index finger, and a column of buttons opens beside it, pressed the same way: Go there, Back off, Closer, Return to the Sun, Let go, and Hide info or Show info. A dot shows where the fingertip is. The menu stays where it opened, upright and facing the viewer, until the wrist button is touched again. (Not the palm turned up, which brings up visionOS's Home button.)
@@ -57,5 +61,6 @@ See [release_notes/v0.1.0.md](release_notes/v0.1.0.md) for details.
 
 - The control service carries out a command sent just before the console closes its connection, such as a `quit` piped through `nc`.
 
-[Unreleased]: https://github.com/peterlharding/stellar-explorer/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/peterlharding/stellar-explorer/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.2.0
 [0.1.0]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.1.0

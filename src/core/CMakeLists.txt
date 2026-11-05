@@ -12,7 +12,7 @@ if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
 	endif()
 endif()
 
-project(stellar_core VERSION 0.1.0 LANGUAGES C CXX)
+project(stellar_core VERSION 0.2.0 LANGUAGES C CXX)
 
 # The engine-independent core (ADR 0008), built as a static library with a C ABI
 # for the Unreal front end to link (ADR 0014). It builds with its own toolchain on
