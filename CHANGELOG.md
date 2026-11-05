@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-06
+
+See [release_notes/v0.4.0.md](release_notes/v0.4.0.md) for details.
+
 ### Added
 
 - "Stellar, backtrack" (or "go back", "take me back", "undo"): back to where the last journey began, with the star kept then kept again; said again, to where the one before began, for up to 50 journeys. Journeys are "go to", "go there", "back off", "closer" and "return to the Sun", by voice, the menus or the console, which has a Backtrack button.
@@ -100,7 +104,8 @@ See [release_notes/v0.1.0.md](release_notes/v0.1.0.md) for details.
 
 - The control service carries out a command sent just before the console closes its connection, such as a `quit` piped through `nc`.
 
-[Unreleased]: https://github.com/peterlharding/stellar-explorer/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/peterlharding/stellar-explorer/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.4.0
 [0.3.0]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.3.0
 [0.2.1]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.2.1
 [0.2.0]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.2.0
