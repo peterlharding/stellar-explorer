@@ -18,7 +18,7 @@ class UTextRenderComponent;
  *
  * In a headset with hand tracking (the Vision Pro) the pointing hand (PointingHand, right unless
  * set otherwise) casts a ray from an estimated shoulder through the hand, and a pinch (thumb tip to
- * index tip) selects. In a headset with controllers instead (the Vive) the ray is the controller's
+ * index tip) selects, if bHandRay is on; by default it is off, and look and pinch does it all. In a headset with controllers instead (the Vive) the ray is the controller's
  * aim and the trigger selects. The other hand (or controller) is tracked only for the gesture that
  * quits. On the desktop the ray runs under the cursor and the mouse works as in Blender, the
  * star kept the pivot: a click keeps the star under it (on empty sky, lets go), middle-drag
@@ -155,6 +155,9 @@ private:
 
 	static constexpr int32 MouseHand = 2;
 
+	/** Hands with no ray (bHandRay off): look and pinch only. */
+	bool IsLookOnly() const { return bHeadset && !bUsingControllers && !bHandRay; }
+
 	/** The rays this frame: one per tracked hand in a headset, the view's centre on the desktop. */
 	TArray<FRay, TInlineAllocator<2>> GetRays(const FVector& Head, const FRotator& HeadRotation);
 	/** The rays from motion controllers, when the headset has those instead of hand tracking. */
@@ -211,6 +214,13 @@ private:
 	/** Two pinches this close together, with a star kept, let it go. From DefaultGame.ini, or -DoublePinch=. */
 	UPROPERTY(Config)
 	float DoublePinchSeconds = 1.0f;
+
+	/**
+	 * With hand tracking, whether the pointing hand has a ray to point with; off, look and
+	 * pinch does it all. From DefaultGame.ini, or -HandRay to turn it on.
+	 */
+	UPROPERTY(Config)
+	bool bHandRay = false;
 
 	/**
 	 * The keys a controller's trigger appears as, when the headset has controllers (the Vive). The
@@ -365,7 +375,7 @@ private:
 	double LastKeptPinch = -1.0e9;
 	/** Pinches before this time are ignored: see GestureGateSeconds. */
 	double GateUntil = -1.0e9;
-	/** Whether the ray is on: in a headset it starts off, and a pinch turns it on. */
+	/** Whether the ray is on: in a headset it starts off, and a pinch turns it on; with no hand ray, the first star kept by look and pinch. */
 	bool bPointingStarted = false;
 	/** The panel's rotation, which follows the head's a little behind. */
 	FQuat PanelRotation = FQuat::Identity;
