@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-05
+
+See [release_notes/v0.3.0.md](release_notes/v0.3.0.md) for details.
+
 ### Added
 
 - Show only the stars near you: everything further than a radius you choose is hidden, and the stars near its edge fade, so the space around you can be seen on its own. The radius moves with you as you travel, and stars beyond it cannot be pointed at.
@@ -88,7 +92,8 @@ See [release_notes/v0.1.0.md](release_notes/v0.1.0.md) for details.
 
 - The control service carries out a command sent just before the console closes its connection, such as a `quit` piped through `nc`.
 
-[Unreleased]: https://github.com/peterlharding/stellar-explorer/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/peterlharding/stellar-explorer/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.3.0
 [0.2.1]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.2.1
 [0.2.0]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.2.0
 [0.1.0]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.1.0
