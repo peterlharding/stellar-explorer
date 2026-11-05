@@ -576,6 +576,7 @@ void AStarPointer::BeginPlay()
 	FParse::Value(FCommandLine::Get(), TEXT("LeftTriggerKey="), LeftTriggerKey);
 	bLogInput = FParse::Param(FCommandLine::Get(), TEXT("LogInput"));
 	bShowControls = FParse::Param(FCommandLine::Get(), TEXT("PanelControls"));
+	bHandRay |= FParse::Param(FCommandLine::Get(), TEXT("HandRay"));
 	if (!bHeadset)
 	{
 		Pointer = MouseHand;
@@ -588,8 +589,8 @@ void AStarPointer::BeginPlay()
 	{
 		UE_LOG(LogStarPointer, Warning, TEXT("PointingHand is \"%s\", not Right or Left: pointing with the right"), *PointingHand);
 	}
-	UE_LOG(LogStarPointer, Display, TEXT("Pointing with hand %d; pinches ignored for %.2f s after a star is kept or let go; two within %.2f s let it go"), Pointer,
-		GestureGateSeconds, DoublePinchSeconds);
+	UE_LOG(LogStarPointer, Display, TEXT("Pointing with hand %d%s; pinches ignored for %.2f s after a star is kept or let go; two within %.2f s let it go"), Pointer,
+		bHandRay ? TEXT("") : TEXT(" (controllers only: hands look and pinch)"), GestureGateSeconds, DoublePinchSeconds);
 
 #if PLATFORM_WINDOWS
 	// With -LogInput, list the controller input keys the engine registered, so a new controller's
@@ -868,8 +869,9 @@ void AStarPointer::Tick(float DeltaSeconds)
 		FHand& State = Hands[Ray.Hand];
 		Pinched += Ray.bPinched ? 1 : 0;
 		// The other hand only counts towards the gesture that quits; and at the hand menu or its
-		// wrist button the pointing hand presses them, so it neither points nor pinches.
-		if (Ray.Hand != Pointer || bFingerAtMenu)
+		// wrist button the pointing hand presses them, so it neither points nor pinches. With no
+		// hand ray, neither hand points: look and pinch does.
+		if (Ray.Hand != Pointer || bFingerAtMenu || IsLookOnly())
 		{
 			State.bWasPinched = Ray.bPinched;
 			continue;
@@ -1457,10 +1459,25 @@ void AStarPointer::UseGazePinches(const FVector& Head)
 		{
 			const int32 Star = StarField->FindStar(Event.Origin, Event.Direction, MaxPointingAngleDegrees);
 			UE_LOG(LogStarPointer, Display, TEXT("Look and pinch: %s"), Star != INDEX_NONE ? *StarField->GetName(Star) : TEXT("no star"));
-			if (Star != INDEX_NONE)
+			if (Star == INDEX_NONE)
+			{
+				continue;
+			}
+			// As with the ray: two in quick succession on the star kept let it go.
+			LastInUse = Now;
+			bPointingStarted = true;
+			if (Star != Selected)
 			{
 				Select(Star);
-				LastInUse = Now;
+			}
+			else if (Now - LastKeptPinch < DoublePinchSeconds)
+			{
+				UE_LOG(LogStarPointer, Display, TEXT("Look and pinch: second %.2f s after the first, letting the star go"), Now - LastKeptPinch);
+				Select(INDEX_NONE);
+			}
+			else
+			{
+				LastKeptPinch = Now;
 			}
 		}
 	}
@@ -1783,10 +1800,12 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 		}
 		Hint->SetText(FText::FromString(!bHeadset ? TEXT("Middle-drag to orbit; click sky to let go")
 				: bUsingControllers               ? TEXT("Pull the trigger twice to let it go")
+				: IsLookOnly()                    ? TEXT("Look at it and pinch twice to let it go")
 												  : TEXT("Pinch twice to let it go")));
 		return;
 	}
-	Hint->SetText(FText::FromString(!bPointingStarted ? (bUsingControllers ? TEXT("Then pull the trigger again to keep a star") : TEXT("Then pinch again to keep a star"))
+	Hint->SetText(FText::FromString(IsLookOnly() ? (Pointer == 0 ? TEXT("To keep it; right wrist: menu") : TEXT("To keep it; left wrist: menu"))
+			: !bPointingStarted                     ? (bUsingControllers ? TEXT("Then pull the trigger again to keep a star") : TEXT("Then pinch again to keep a star"))
 			: !bHeadset                             ? TEXT("Click a star to keep it; drag to look")
 			: bUsingControllers                     ? TEXT("Pull the trigger to keep a star, both to exit")
 			: Pointer == 0                          ? TEXT("Pinch to keep a star; right wrist: menu")
@@ -1796,7 +1815,8 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 		ShowStar(Hovered, HoverColour);
 		return;
 	}
-	Title->SetText(FText::FromString(!bPointingStarted ? (bUsingControllers ? TEXT("Pull the trigger to start pointing") : TEXT("Pinch to start pointing"))
+	Title->SetText(FText::FromString(IsLookOnly()      ? TEXT("Look at a star and pinch")
+			: !bPointingStarted                    ? (bUsingControllers ? TEXT("Pull the trigger to start pointing") : TEXT("Pinch to start pointing"))
 			: bHeadset                              ? TEXT("Point at a star")
 													: TEXT("Move over a star")));
 	Title->SetTextRenderColor((HintColour * OverlayBrightness).ToFColor(false));
