@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- On the Vision Pro the pointing hand no longer casts a ray: look at a star and pinch to keep it, and look at it and pinch twice to let it go. `bHandRay=True` in `DefaultGame.ini`, or `-HandRay` on the command line, brings the ray back. The Vive's controllers keep theirs.
+
 ## [0.2.0] - 2026-11-05
 
 See [release_notes/v0.2.0.md](release_notes/v0.2.0.md) for details.
