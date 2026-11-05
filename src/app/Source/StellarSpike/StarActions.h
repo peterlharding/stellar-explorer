@@ -15,7 +15,7 @@ class AStarPointer;
  * kept or pointed at), "back off" and "closer" (from and to it), "return to the Sun", "let go",
  * "hide info" and "show info" (the panel describing the star), and how far out stars are shown:
  * "show more", "show less", "show within 20 light years" (or parsecs), "show everything"; and
- * "quit", said twice.
+ * "quit", said twice; and "backtrack" (or "go back"), to where each journey began in turn.
  *
  * A command arrives as text, typed or heard, and the core (stc_voice_*) turns it into an
  * action and a star, from the catalogue's names and their spoken forms, which this actor
@@ -58,8 +58,22 @@ private:
 	 * where the head is after a move: the camera reports where it was in the last frame.
 	 */
 	void Face(int32 Star, const FVector& From);
-	/** Move the viewer so the head ends at Target, keeping where the head is within the tracked space. */
+	/**
+	 * Move the viewer so the head ends at Target, keeping where the head is within the tracked
+	 * space. A journey: where the head was, and the star kept, go on the history first.
+	 */
 	void MoveHeadTo(const FVector& Target);
+	void MoveHeadWithoutHistory(const FVector& Target);
+
+	/** Where a journey began, for "backtrack": the head, the star kept, and on the desktop which way it faced. */
+	struct FWaypoint
+	{
+		FVector Head;
+		int32 Kept;
+		FRotator Facing;
+	};
+	/** The journeys' starts, the latest last; "backtrack" takes them back in turn. */
+	TArray<FWaypoint> History;
 
 	UPROPERTY()
 	TObjectPtr<AStarField> StarField;

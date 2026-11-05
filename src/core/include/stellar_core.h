@@ -20,7 +20,7 @@ extern "C" {
 #endif
 
 /* ABI version of this library; a caller checks it matches this header. */
-#define STC_ABI_VERSION 6u
+#define STC_ABI_VERSION 7u
 uint32_t stc_abi_version(void);
 
 /* A position in parsecs, right-handed ICRS equatorial Cartesian. POD, by value. */
@@ -124,7 +124,8 @@ typedef enum StcVoiceAction
 	STC_VOICE_SHOW_LESS = 13,     /* "show less": only stars half as far out shown */
 	STC_VOICE_SHOW_WITHIN = 14,   /* "show within 20 light years" (or parsecs): radius_parsecs set, 0 if no distance was heard */
 	STC_VOICE_SHOW_EVERYTHING = 15, /* "show everything": no limit to how far out stars are shown */
-	STC_VOICE_QUIT = 16            /* "quit" or "exit": the app, which asks for it twice */
+	STC_VOICE_QUIT = 16,           /* "quit" or "exit": the app, which asks for it twice */
+	STC_VOICE_BACKTRACK = 17       /* "backtrack" or "go back": to where the last journey began */
 } StcVoiceAction;
 
 /* Capacity (including the NUL) of StcVoiceCommand's target: what was heard. */

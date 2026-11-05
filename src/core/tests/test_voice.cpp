@@ -157,6 +157,12 @@ int main()
 		check(unit("Stellar show within 5") == 0 && unit("Stellar show within 5 light years") == 1 && unit("Stellar show within 5 parsecs") == 2,
 			"the unit heard, or none");
 	}
+	// Back along the journeys made; "go back to the Sun" is still the Sun.
+	expect(voice, "Stella backtrack", VoiceAction::Backtrack, -1);
+	expect(voice, "Stellar go back", VoiceAction::Backtrack, -1);
+	expect(voice, "take me back please", VoiceAction::Backtrack, -1);
+	expect(voice, "go back to the Sun", VoiceAction::ReturnToSun, 1);
+
 	// Quitting, heard in the headset as both.
 	expect(voice, "Stellar quit", VoiceAction::Quit, -1);
 	expect(voice, "Stellar exit", VoiceAction::Quit, -1);
