@@ -67,7 +67,7 @@ private:
 	void SetFilter(const FString& Filter);
 	bool Matches(const FString& Line) const;
 	void Follow(float DeltaSeconds);
-	TSharedRef<ITableRow> MakeLogRow(TSharedPtr<FString> Line, const TSharedRef<STableViewBase>& Owner) const;
+	TSharedRef<ITableRow> MakeLogRow(TSharedPtr<FString> Line, const TSharedRef<STableViewBase>& OwnerTable) const;
 
 	UPROPERTY()
 	TObjectPtr<AStarActions> Actions;
