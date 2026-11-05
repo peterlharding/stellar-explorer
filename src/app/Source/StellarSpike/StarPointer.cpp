@@ -192,31 +192,64 @@ namespace
 	{
 		return HandMenuHeight / 2.0 - HandButtonHeight / 2.0 - Item * (HandButtonHeight + HandButtonGap);
 	}
-	// Under the hand menu, the bar that moves it and, to its left, the button that closes it, as
-	// under the panel; and how far from each a look or the fingertip still counts.
+	// Under the buttons, the slider for how far out stars are shown: what it is set to, and below
+	// that its track, as wide as a button, with a knob; a look or the fingertip counts from
+	// HandSliderReach below the track to the top of the label.
+	constexpr double HandSliderGap = 1.4;
+	constexpr double HandSliderLabelUp = -HandMenuHeight / 2.0 - HandSliderGap;
+	constexpr double HandSliderUp = HandSliderLabelUp - 1.3;
+	constexpr double HandSliderWidth = HandButtonWidth;
+	constexpr double HandSliderThickness = 0.15;
+	constexpr double HandKnobDiameter = 0.9;
+	constexpr double HandSliderReach = 1.0;
+	/** The fingertip sets the slider while within this in front of it. */
+	constexpr double SliderTouchDepth = 0.5;
+	// Under the slider, the bar that moves the menu and, to its left, the button that closes it,
+	// as under the panel; and how far from each a look or the fingertip still counts.
 	constexpr double HandBarWidth = 4.0;
 	constexpr double HandBarHeight = 0.4;
-	constexpr double HandBarGap = 1.0;
+	constexpr double HandBarGap = 1.4;
 	constexpr double HandBarReach = 0.8;
 	constexpr double HandHideRadius = 0.55;
 	constexpr double HandHideGap = 0.8;
 	constexpr double HandHideReach = 1.1;
-	constexpr double HandBarUp = -HandMenuHeight / 2.0 - HandBarGap - HandBarHeight / 2.0;
+	constexpr double HandBarUp = HandSliderUp - HandBarGap - HandBarHeight / 2.0;
 	constexpr double HandHideRight = -HandBarWidth / 2.0 - HandHideGap - HandHideRadius;
 	/** The hand menu's parts after its items (AStarPointer::HandMenuPartAt). */
 	constexpr int32 HandPartBar = MenuCount;
 	constexpr int32 HandPartHide = MenuCount + 1;
+	constexpr int32 HandPartSlider = MenuCount + 2;
 
 	// What a look-and-pinch moves with the hand, which takes it further than the hand goes by
 	// as much as it is further from the head, but never nearer or further than these.
 	constexpr int32 MoveNone = 0;
 	constexpr int32 MovePanel = 1;
 	constexpr int32 MoveHandMenu = 2;
+	/** Not moved but slid: the slider's knob follows the hand across. */
+	constexpr int32 MoveSlider = 3;
 	constexpr double PanelNearest = 40.0;
 	constexpr double PanelFurthest = 250.0;
 	constexpr double HandMenuNearest = 20.0;
 	constexpr double HandMenuFurthest = 80.0;
 	constexpr double GazeEchoSeconds = 0.15;
+
+	// Both hands pinched and moved apart by ResizeStart (or together), the view radius follows,
+	// doubling for each ResizeDoubling further apart; held still, they quit as before. The
+	// countdown to quitting shows only after ExitWarnSeconds, so it does not flash as a resize
+	// begins.
+	// Hand tracking sees both hands pinched for a frame or two at times, and the fingertips jump
+	// a centimetre or two as they do, which in the first headset test resized back and forth
+	// in tenths of a second: a resize starts only once both have been pinched for
+	// ResizeArmSeconds, and follows the fingertips' distance smoothed over ResizeSmoothingSeconds.
+	constexpr double ResizeStart = 3.0;
+	constexpr double ResizeDoubling = 8.0;
+	constexpr double ResizeArmSeconds = 0.2;
+	// Both pinches must begin within ResizeTogetherSeconds of each other: in the first headset
+	// test a hand resting closed, seen as pinched, and the other dragging the slider by look and
+	// pinch, resized as the dragging hand moved.
+	constexpr double ResizeTogetherSeconds = 0.4;
+	constexpr double ResizeSmoothingSeconds = 0.08;
+	constexpr double ExitWarnSeconds = 0.5;
 
 	// The colours as they are meant to look. The tonemapper washes bright colours out to
 	// white, so they are drawn at OverlayBrightness; and text colours are used as they are,
@@ -479,6 +512,22 @@ AStarPointer::AStarPointer()
 		Text->SetVerticalAlignment(EVRTA_TextCenter);
 		HandItems.Add(Text);
 	}
+	HandSliderTrack = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("HandSliderTrack"));
+	HandSliderTrack->SetupAttachment(HandMenu);
+	HandSliderTrack->SetRelativeLocation(OnPanel(0.0, HandSliderUp));
+	HandSliderKnob = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HandSliderKnob"));
+	HandSliderKnob->SetupAttachment(HandMenu);
+	HandSliderKnob->SetCastShadow(false);
+	HandSliderKnob->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	// The basic sphere is 100 units across; flattened onto the menu's plane.
+	HandSliderKnob->SetRelativeScale3D(FVector(0.1, 1.0, 1.0) * HandKnobDiameter / 100.0);
+	HandSliderLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("HandSliderLabel"));
+	HandSliderLabel->SetupAttachment(HandMenu);
+	HandSliderLabel->SetRelativeLocation(OnPanel(-HandSliderWidth / 2.0, HandSliderLabelUp));
+	HandSliderLabel->SetWorldSize(HandTextSize);
+	HandSliderLabel->SetHorizontalAlignment(EHTA_Left);
+	HandSliderLabel->SetVerticalAlignment(EVRTA_TextCenter);
+	HandSliderLabel->SetText(FText::GetEmpty());
 	HandBar = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("HandBar"));
 	HandBar->SetupAttachment(HandMenu);
 	HandBar->SetRelativeLocation(OnPanel(0.0, HandBarUp));
@@ -526,6 +575,8 @@ void AStarPointer::BeginPlay()
 		Button->SetMaterial(0, Material);
 		HandFrameMaterials.Add(Material);
 	}
+	BuildQuad(HandSliderTrack, HandSliderWidth, HandSliderThickness);
+	HandSliderTrack->SetMaterial(0, ColouredMaterial(BarColour));
 	BuildQuad(HandBar, HandBarWidth, HandBarHeight);
 	HandBarMaterial = ColouredMaterial(BarColour);
 	HandBar->SetMaterial(0, HandBarMaterial);
@@ -550,6 +601,7 @@ void AStarPointer::BeginPlay()
 			Item->SetTextMaterial(Text);
 		}
 		WristText->SetTextMaterial(Text);
+		HandSliderLabel->SetTextMaterial(Text);
 	}
 	UStaticMesh* Sphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	Dots->SetStaticMesh(Sphere);
@@ -557,6 +609,9 @@ void AStarPointer::BeginPlay()
 	FingerDot->SetStaticMesh(Sphere);
 	FingerDotMaterial = ColouredMaterial(DotColour);
 	FingerDot->SetMaterial(0, FingerDotMaterial);
+	HandSliderKnob->SetStaticMesh(Sphere);
+	HandSliderKnobMaterial = ColouredMaterial(DetailsColour);
+	HandSliderKnob->SetMaterial(0, HandSliderKnobMaterial);
 	for (int32 Dot = 0; Dot < DotCount; ++Dot)
 	{
 		Dots->AddInstance(FTransform::Identity, true);
@@ -1001,7 +1056,8 @@ void AStarPointer::Tick(float DeltaSeconds)
 	}
 
 	// Both hands pinched and held: quit.
-	BothPinchedSeconds = Pinched == 2 ? BothPinchedSeconds + DeltaSeconds : 0.0;
+	UpdateResize(Pinched, DeltaSeconds);
+	BothPinchedSeconds = Pinched == 2 && !bResizing ? BothPinchedSeconds + DeltaSeconds : 0.0;
 	if (BothPinchedSeconds >= HoldToExitSeconds)
 	{
 		UE_LOG(LogStarPointer, Display, TEXT("Both hands pinched for %.0f s: exiting"), HoldToExitSeconds);
@@ -1269,8 +1325,20 @@ void AStarPointer::UpdateHandMenu(const FVector& Head, const FRotator& HeadRotat
 				FingerDotMaterial->SetVectorParameterValue(TEXT("Colour"), (HandAimed != INDEX_NONE ? SelectionColour : DotColour) * OverlayBrightness);
 			}
 		}
+		// The fingertip on the slider sets it where it touches, and follows it across.
+		const bool bOnSlider = Under == HandPartSlider && Depth <= SliderTouchDepth && Depth >= -PokeBehind;
+		if (bOnSlider)
+		{
+			SetViewRadius(AStarField::ViewRadiusAt((Right + HandSliderWidth / 2.0) / HandSliderWidth));
+		}
+		else if (bSliderTouched)
+		{
+			UE_LOG(LogStarPointer, Display, TEXT("Hand menu slider: %s"), *AStarField::DescribeViewRadius(StarField->GetViewRadius()));
+		}
+		bSliderTouched = bOnSlider;
 		// The bar is for moving the menu by look-and-pinch: a poke on it does nothing.
-		if (bPokeArmed && PokeDepth > 0.0 && Depth <= 0.0 && Depth >= -PokeBehind && Under != INDEX_NONE && Under != HandPartBar && Now >= PokeGateUntil)
+		if (bPokeArmed && PokeDepth > 0.0 && Depth <= 0.0 && Depth >= -PokeBehind && Under != INDEX_NONE && Under != HandPartBar && Under != HandPartSlider &&
+			Now >= PokeGateUntil)
 		{
 			UE_LOG(LogStarPointer, Display, TEXT("Hand menu pressed: item %d"), Under);
 			bPokeArmed = false;
@@ -1312,6 +1380,85 @@ void AStarPointer::UpdateHandMenu(const FVector& Head, const FRotator& HeadRotat
 	{
 		HandHideMaterial->SetVectorParameterValue(TEXT("Colour"), (HandAimed == HandPartHide ? SelectionColour : FrameColour) * OverlayBrightness);
 	}
+	// The slider: its knob where the view radius is, lit while it is being set.
+	const bool bSliding = bSliderTouched || GazeMoving == MoveSlider || bResizing;
+	const double Radius = StarField != nullptr ? StarField->GetViewRadius() : 0.0;
+	HandSliderKnob->SetRelativeLocation(OnPanel(-HandSliderWidth / 2.0 + AStarField::ViewFraction(Radius) * HandSliderWidth, HandSliderUp) + FVector(0.05, 0.0, 0.0));
+	HandSliderLabel->SetText(FText::FromString(AStarField::DescribeViewRadius(Radius)));
+	HandSliderLabel->SetTextRenderColor(((bSliding ? SelectionColour : DetailsColour) * OverlayBrightness).ToFColor(false));
+	if (HandSliderKnobMaterial != nullptr)
+	{
+		HandSliderKnobMaterial->SetVectorParameterValue(TEXT("Colour"), (bSliding || HandAimed == HandPartSlider ? SelectionColour : DetailsColour) * OverlayBrightness);
+	}
+}
+
+void AStarPointer::SetViewRadius(double Parsecs)
+{
+	if (StarField == nullptr)
+	{
+		return;
+	}
+	StarField->SetViewRadius(Parsecs);
+	ShowNote(AStarField::DescribeViewRadius(StarField->GetViewRadius()));
+}
+
+void AStarPointer::UpdateResize(int32 Pinched, float DeltaSeconds)
+{
+	const double Now = GetWorld()->GetRealTimeSeconds();
+	for (int32 Hand = 0; Hand < 2; ++Hand)
+	{
+		const bool bPinchedNow = Hands[Hand].bHandTracked && Hands[Hand].bPinched;
+		PinchBegan[Hand] = !bPinchedNow ? -1.0 : PinchBegan[Hand] < 0.0 ? Now : PinchBegan[Hand];
+	}
+	const bool bBoth = bHeadset && !bUsingControllers && Pinched == 2 && PinchBegan[0] >= 0.0 && PinchBegan[1] >= 0.0;
+	if (!bBoth)
+	{
+		if (bResizing)
+		{
+			UE_LOG(LogStarPointer, Display, TEXT("Resized from %s to %s"), *AStarField::DescribeViewRadius(ResizeFromRadius),
+				*AStarField::DescribeViewRadius(StarField->GetViewRadius()));
+		}
+		bResizing = false;
+		bResizeArmed = false;
+		bBothWerePinched = false;
+		return;
+	}
+	const double Gap = FVector::Distance(Hands[0].IndexTip, Hands[1].IndexTip);
+	if (!bBothWerePinched)
+	{
+		BothPinchedSince = Now;
+		ResizeGap = Gap;
+	}
+	bBothWerePinched = true;
+	ResizeGap += (Gap - ResizeGap) * (1.0 - FMath::Exp(-DeltaSeconds / ResizeSmoothingSeconds));
+	if (!bResizeArmed)
+	{
+		if (Now - BothPinchedSince < ResizeArmSeconds)
+		{
+			return;
+		}
+		// Not one hand's pinch that has been held while the other began, and not while a look
+		// and pinch is dragging something: neither is a two-hand gesture. Held, it may still quit.
+		if (FMath::Abs(PinchBegan[0] - PinchBegan[1]) > ResizeTogetherSeconds || GazeMoving != MoveNone)
+		{
+			return;
+		}
+		bResizeArmed = true;
+		ResizeFromGap = ResizeGap;
+		// From every star shown, as from the furthest radius.
+		ResizeFromRadius = StarField->GetViewRadius() > 0.0 ? StarField->GetViewRadius() : AStarField::FurthestViewLightYears / AStarField::LightYearsPerParsec;
+	}
+	if (!bResizing && FMath::Abs(ResizeGap - ResizeFromGap) > ResizeStart)
+	{
+		bResizing = true;
+		// A look and pinch moving something with one of the hands stops: both are resizing.
+		GazeMoving = MoveNone;
+		UE_LOG(LogStarPointer, Display, TEXT("Both hands pinched and moving %s: resizing"), ResizeGap > ResizeFromGap ? TEXT("apart") : TEXT("together"));
+	}
+	if (bResizing)
+	{
+		SetViewRadius(ResizeFromRadius * FMath::Pow(2.0, (ResizeGap - ResizeFromGap) / ResizeDoubling));
+	}
 }
 
 int32 AStarPointer::HandMenuPartAt(double Right, double Up, double Margin) const
@@ -1325,6 +1472,10 @@ int32 AStarPointer::HandMenuPartAt(double Right, double Up, double Margin) const
 				return Item;
 			}
 		}
+	}
+	if (Up <= HandSliderLabelUp + HandTextSize && Up >= HandSliderUp - HandSliderReach && FMath::Abs(Right) <= HandSliderWidth / 2.0 + Margin)
+	{
+		return HandPartSlider;
 	}
 	if (FMath::Abs(Up - HandBarUp) <= HandBarReach && FMath::Abs(Right) <= HandBarWidth / 2.0 + Margin)
 	{
@@ -1360,6 +1511,12 @@ void AStarPointer::UseGazePinches(const FVector& Head)
 			{
 				continue;
 			}
+			if (Event.Phase == GazePinch::EPhase::Ended && GazeMoving == MoveSlider)
+			{
+				UE_LOG(LogStarPointer, Display, TEXT("Look and pinch: slider let go, %s"), *AStarField::DescribeViewRadius(StarField->GetViewRadius()));
+				GazeMoving = MoveNone;
+				continue;
+			}
 			if (Event.Phase == GazePinch::EPhase::Ended)
 			{
 				UE_LOG(LogStarPointer, Display, TEXT("Look and pinch: %s put down %.0f cm from the head"), GazeMoving == MovePanel ? TEXT("panel") : TEXT("hand menu"),
@@ -1369,6 +1526,14 @@ void AStarPointer::UseGazePinches(const FVector& Head)
 			}
 			if (!Event.bHasHand)
 			{
+				continue;
+			}
+			if (GazeMoving == MoveSlider)
+			{
+				// Across the menu as the hand goes across it: from where the knob was (GazeMoveFrom.X).
+				const FVector Across = HandMenu->GetComponentTransform().TransformVectorNoScale(OnPanel(1.0, 0.0));
+				const double Slid = FVector::DotProduct(Event.Hand - GazeHandFrom, Across) / HandSliderWidth;
+				SetViewRadius(AStarField::ViewRadiusAt(FMath::Clamp(GazeMoveFrom.X + Slid, 0.0, 1.0)));
 				continue;
 			}
 			const FVector Offset = GazeMoveFrom + (Event.Hand - GazeHandFrom) * GazeMoveGain - Head;
@@ -1427,6 +1592,11 @@ void AStarPointer::UseGazePinches(const FVector& Head)
 			GazeMovingId = Event.Id;
 			GazeMoveFrom = From;
 			GazeHandFrom = Event.Hand;
+			if (What == MoveSlider)
+			{
+				UE_LOG(LogStarPointer, Display, TEXT("Look and pinch: the slider"));
+				return;
+			}
 			GazeMoveGain = FMath::Max(1.0, FVector::Distance(Head, From) / FMath::Max(FVector::Distance(Head, Event.Hand), 1.0));
 			UE_LOG(LogStarPointer, Display, TEXT("Look and pinch: moving the %s, %.1f times as far as the hand"), Name, GazeMoveGain);
 		};
@@ -1445,6 +1615,10 @@ void AStarPointer::UseGazePinches(const FVector& Head)
 		else if (HandPart == HandPartBar)
 		{
 			StartMoving(MoveHandMenu, HandMenu->GetComponentLocation(), TEXT("hand menu"));
+		}
+		else if (HandPart == HandPartSlider)
+		{
+			StartMoving(MoveSlider, FVector(AStarField::ViewFraction(StarField->GetViewRadius()), 0.0, 0.0), TEXT("slider"));
 		}
 		else if (Part == PartBar || Part == PartBody)
 		{
@@ -1742,7 +1916,7 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 	{
 		LastInUse = Now;
 	}
-	bInfoVisible = BothPinchedSeconds > 0.0 || (bInfoShown && (!bHeadset || Now - LastInUse < InfoIdleSeconds));
+	bInfoVisible = BothPinchedSeconds > ExitWarnSeconds || (bInfoShown && (!bHeadset || Now - LastInUse < InfoIdleSeconds));
 	Frame->SetVisibility(bInfoVisible);
 	Title->SetVisibility(bInfoVisible);
 	Details->SetVisibility(bInfoVisible);
@@ -1777,7 +1951,7 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 		MenuItems[Item]->SetTextRenderColor(((Aimed == PartItem + Item ? SelectionColour : DetailsColour) * OverlayBrightness).ToFColor(false));
 	}
 
-	if (BothPinchedSeconds > 0.0)
+	if (BothPinchedSeconds > ExitWarnSeconds)
 	{
 		Title->SetText(FText::FromString(bUsingControllers ? TEXT("Hold both triggers to exit") : TEXT("Keep pinching to exit")));
 		Title->SetTextRenderColor((SelectionColour * OverlayBrightness).ToFColor(false));
@@ -1821,7 +1995,7 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 													: TEXT("Move over a star")));
 	Title->SetTextRenderColor((HintColour * OverlayBrightness).ToFColor(false));
 	// With nothing to describe, the build, so a session can be matched to its code.
-	Details->SetText(FText::FromString(FString::Printf(TEXT("v%s, build %s\n%s, %s"), *StellarVersion(), *StellarShortCommit(), STELLAR_SPIKE_BRANCH, STELLAR_SPIKE_BUILT)));
+	Details->SetText(FText::FromString(FString::Printf(TEXT("v%s, build %s\n%s"), *StellarVersion(), *StellarShortCommit(), *StellarShortBranchAndTime())));
 }
 
 void AStarPointer::ShowStar(int32 Star, const FLinearColor& Colour)

@@ -23,6 +23,7 @@
 #include "StarPointer.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SSlider.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SBorder.h"
@@ -39,6 +40,12 @@ DEFINE_LOG_CATEGORY_STATIC(LogStarConsole, Log, All);
 namespace
 {
 	constexpr double RetrySeconds = 2.0;
+	/**
+	 * A connection attempt gives up after this. Left to the system, one to a headset that has
+	 * gone (asleep, or its app quit) took more than a minute, and quitting the console waited
+	 * for it.
+	 */
+	constexpr double ConnectSeconds = 2.0;
 	/** Why Receive disconnects when the other app closes its end. */
 	const TCHAR* const ClosedByApp = TEXT("the other app closed the connection");
 	constexpr double StateSeconds = 0.2;
@@ -53,7 +60,9 @@ namespace
 
 	/** The commands that need no star's name, as buttons. */
 	const TCHAR* const Buttons[] = {TEXT("Go there"), TEXT("Back off"), TEXT("Closer"), TEXT("Let go"), TEXT("Return to the Sun"),
-		TEXT("Galactic north"), TEXT("Celestial north"), TEXT("Hide info"), TEXT("Show info")};
+		TEXT("Galactic north"), TEXT("Celestial north"), TEXT("Hide info"), TEXT("Show info"), TEXT("Show more"), TEXT("Show less"), TEXT("Show everything")};
+	/** While the view radius slider is dragged, it sends no more often than this. */
+	constexpr double SliderSendSeconds = 0.1;
 
 	/** An ICRS vector from the control service in this app's frame (y flipped), scaled. */
 	bool ReadIcrs(const TSharedPtr<FJsonObject>& Message, const TCHAR* Field, double Scale, FVector& Out)
@@ -199,6 +208,37 @@ void AStarConsole::BuildPanel()
 					}
 				})];
 	Column->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 6.0f)[ButtonRow];
+	// How far out stars are shown, evenly by ratio, every star at the right-hand end.
+	Column->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 2.0f)
+		[SNew(STextBlock).Text_Lambda([Weak]() {
+			return FText::FromString(Weak.IsValid() ? AStarField::DescribeViewRadius(AStarField::ViewRadiusAt(Weak->SliderValue)) : FString());
+		})];
+	Column->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 6.0f)
+		[SNew(SSlider)
+				.Value_Lambda([Weak]() { return Weak.IsValid() ? static_cast<float>(Weak->SliderValue) : 1.0f; })
+				.OnMouseCaptureBegin_Lambda([Weak]() {
+					if (Weak.IsValid())
+					{
+						Weak->bSliderHeld = true;
+					}
+				})
+				.OnMouseCaptureEnd_Lambda([Weak]() {
+					if (Weak.IsValid())
+					{
+						Weak->bSliderHeld = false;
+						Weak->SendViewRadius();
+					}
+				})
+				.OnValueChanged_Lambda([Weak](float Value) {
+					if (Weak.IsValid())
+					{
+						Weak->SliderValue = Value;
+						if (FPlatformTime::Seconds() >= Weak->NextSliderSend)
+						{
+							Weak->SendViewRadius();
+						}
+					}
+				})];
 	if (IsRemote())
 	{
 		Column->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 6.0f)
@@ -382,9 +422,15 @@ void AStarConsole::Connect()
 			TSharedRef<FInternetAddr> Address = Result.Address->Clone();
 			Address->SetPort(Port);
 			FSocket* Candidate = Sockets->CreateSocket(NAME_Stream, TEXT("Stellar console"), Address->GetProtocolType());
-			if (Candidate != nullptr && Candidate->Connect(*Address))
+			// Without blocking, so the attempt can be given up after ConnectSeconds.
+			if (Candidate != nullptr && Candidate->SetNonBlocking(true))
 			{
-				return Candidate;
+				Candidate->Connect(*Address);
+				if (Candidate->Wait(ESocketWaitConditions::WaitForWrite, FTimespan::FromSeconds(ConnectSeconds)) &&
+					Candidate->GetConnectionState() == SCS_Connected)
+				{
+					return Candidate;
+				}
 			}
 			if (Candidate != nullptr)
 			{
@@ -490,7 +536,25 @@ void AStarConsole::Handle(const FString& Line)
 			Icrs = FVector(Position.X, -Position.Y, Position.Z) / AStarField::UnitsPerParsec;
 		}
 		ShowState(Message->GetStringField(TEXT("build")), Icrs, Message->GetStringField(TEXT("kept")), Message->GetStringField(TEXT("pointed")));
+		// The same stars shown here as there, and the slider where it is set there.
+		double Radius = 0.0;
+		if (Message->TryGetNumberField(TEXT("view_radius"), Radius))
+		{
+			StarField->SetViewRadius(Radius);
+			if (!bSliderHeld)
+			{
+				SliderValue = AStarField::ViewFraction(Radius);
+			}
+		}
 	}
+}
+
+void AStarConsole::SendViewRadius()
+{
+	NextSliderSend = FPlatformTime::Seconds() + SliderSendSeconds;
+	const double Radius = AStarField::ViewRadiusAt(SliderValue);
+	// Four decimals: a point written with fewer than three might be read as a thousands separator.
+	SendCommand(Radius > 0.0 ? FString::Printf(TEXT("show within %.4f parsecs"), Radius) : FString(TEXT("show everything")));
 }
 
 void AStarConsole::SendCommand(const FString& Command)
@@ -552,6 +616,10 @@ void AStarConsole::ShowLocalState()
 	}
 	ShowState(StellarBuild(), Position,
 		Name(StarField, Pointer->GetKept()), Name(StarField, Pointer->GetPointed()));
+	if (!bSliderHeld)
+	{
+		SliderValue = AStarField::ViewFraction(StarField->GetViewRadius());
+	}
 }
 
 void AStarConsole::AddLog(const FString& Line)

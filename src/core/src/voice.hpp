@@ -25,6 +25,11 @@ namespace stellar::core
 		AlignCelestial = 9,
 		HideInfo = 10,
 		ShowInfo = 11,
+		ShowMore = 12,
+		ShowLess = 13,
+		ShowWithin = 14,
+		ShowEverything = 15,
+		Quit = 16,
 	};
 
 	struct VoiceCommand
@@ -38,6 +43,11 @@ namespace stellar::core
 		std::string name;
 		// What was heard where a star's name should be, normalised; empty if nothing.
 		std::string target;
+		// For ShowWithin, the distance heard, in parsecs ("20 light years", "6.5 parsecs"); 0 if none.
+		double radius_parsecs = 0.0;
+		// The unit said with it: 0 none (light years taken), 1 light years, 2 parsecs. With
+		// none, the app waits a moment longer for one.
+		int radius_unit = 0;
 	};
 
 	// Lower case, letters and digits only, words separated by single spaces, numbers

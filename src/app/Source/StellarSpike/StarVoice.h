@@ -22,8 +22,9 @@ class AStarPointer;
  *    button (Vive) or V (desktop), say the command, and let go.
  *  - Wake word: say "Stellar, go to Sirius" at any time; the command is acted on once
  *    it has stood unchanged for CommandPauseSeconds (WakePauseSeconds with a star's name,
- *    which the recogniser may still correct), whatever else is still being said, or once
- *    the words stop for WakePauseSeconds.
+ *    which the recogniser may still correct; "show within" waits for its distance, and a
+ *    while for its unit), whatever else is still being said, or once the words stop for
+ *    WakePauseSeconds.
  * What was heard shows just above the panel, and the time from the end of speaking to
  * acting is logged, for the voice spike.
  */
@@ -107,6 +108,9 @@ private:
 	/** Wake word: the command in the words so far (an StcVoiceAction and a star), and since when it has been that. */
 	int32 LastAction = STC_VOICE_NONE;
 	int64 LastStar = -1;
+	/** With "show within", the distance heard so far, in parsecs, and its unit (StcVoiceCommand.radius_unit). */
+	double LastRadius = 0.0;
+	int32 LastUnit = 0;
 	double CommandSince = 0.0;
 	FString LoggedStatus;
 	double LineUntil = 0.0;

@@ -6,6 +6,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- Show only the stars near you: everything further than a radius you choose is hidden, and the stars near its edge fade, so the space around you can be seen on its own. The radius moves with you as you travel, and stars beyond it cannot be pointed at.
+  - On the Vision Pro, a slider under the hand menu's buttons, set by touching it or by looking at it, pinching and sliding the hand; or pinch with both hands and move them apart to see further out, or together to see less. Holding both pinches still quits, as before.
+  - By voice: "Stellar, show more" (twice as far out), "show less" (half as far), "show within 20 light years" (or parsecs, or just "show 20 light years"), "show everything". After "show within" it waits for the distance, and a moment for its unit.
+  - In the desktop console, a slider and Show more, Show less and Show everything buttons. Steering a headset, the console shows the same stars as it does.
+- On the Vision Pro, the window shown while the app starts is this app's: "Stellar Explorer", the version and build, and "Opening the sky…", in place of Unreal's developer text (its name for the window, the immersion settings and a "Go Immersive!" countdown).
+- "Stellar, quit" or "Stellar, exit" by voice (also "close the app"): the app asks for it again, and quits if "quit" is said again within 8 seconds, with or without "Stellar".
+
+### Changed
+
+- The core's interface version is 6: rebuild the core libraries after pulling (`scripts/make_macos.sh`, and `build-msvc` on Windows).
+- The panel's build line is shorter ("local-space, 5 Nov 12:15"), so a long branch name no longer runs past the frame.
+- In a headset the countdown to quitting shows once both hands have been pinched for half a second, so it does not flash up as a two-hand gesture begins.
+
+### Fixed
+
+- Quitting the desktop console no longer takes a minute or more after the headset app has closed: it waited for an attempt to reconnect, which now gives up after 2 seconds.
+
 ## [0.2.1] - 2026-11-05
 
 See [release_notes/v0.2.1.md](release_notes/v0.2.1.md) for details.
