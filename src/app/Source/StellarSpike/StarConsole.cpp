@@ -265,8 +265,8 @@ void AStarConsole::BuildPanel()
 		[SAssignNew(LogView, SListView<TSharedPtr<FString>>)
 				.ListItemsSource(&ShownLines)
 				.SelectionMode(ESelectionMode::None)
-				.OnGenerateRow_Lambda([Weak](TSharedPtr<FString> Line, const TSharedRef<STableViewBase>& Owner) -> TSharedRef<ITableRow> {
-					return Weak.IsValid() ? Weak->MakeLogRow(Line, Owner) : SNew(STableRow<TSharedPtr<FString>>, Owner);
+				.OnGenerateRow_Lambda([Weak](TSharedPtr<FString> Line, const TSharedRef<STableViewBase>& OwnerTable) -> TSharedRef<ITableRow> {
+					return Weak.IsValid() ? Weak->MakeLogRow(Line, OwnerTable) : SNew(STableRow<TSharedPtr<FString>>, OwnerTable);
 				})];
 	// Quit this app as a menu or Command-Q would, so it shuts down cleanly; steering another,
 	// that one too, by the control service's "quit".
@@ -297,14 +297,14 @@ void AStarConsole::BuildPanel()
 							.BorderBackgroundColor(PanelColour)
 							.Padding(12.0f)[Column]]];
 	GEngine->GameViewport->AddViewportWidgetContent(Panel.ToSharedRef(), 10);
-	const FString Role = IsRemote() ? FString::Printf(TEXT("Stellar Explorer: console for %s"), *Host) : FString(TEXT("Stellar Explorer"));
-	Title = FText::FromString(FString::Printf(TEXT("%s %s (build %s, %s)"), *Role, *StellarVersion(), STELLAR_SPIKE_COMMIT, STELLAR_SPIKE_BRANCH));
+	const FString RolePrefix = IsRemote() ? FString::Printf(TEXT("Stellar Explorer: console for %s"), *Host) : FString(TEXT("Stellar Explorer"));
+	Title = FText::FromString(FString::Printf(TEXT("%s %s (build %s, %s)"), *RolePrefix, *StellarVersion(), STELLAR_SPIKE_COMMIT, STELLAR_SPIKE_BRANCH));
 	FDesktopMouse::SetExcluded(Panel);
 }
 
-TSharedRef<ITableRow> AStarConsole::MakeLogRow(TSharedPtr<FString> Line, const TSharedRef<STableViewBase>& Owner) const
+TSharedRef<ITableRow> AStarConsole::MakeLogRow(TSharedPtr<FString> Line, const TSharedRef<STableViewBase>& OwnerTable) const
 {
-	return SNew(STableRow<TSharedPtr<FString>>, Owner)
+	return SNew(STableRow<TSharedPtr<FString>>, OwnerTable)
 		[SNew(STextBlock).Text(FText::FromString(*Line)).ColorAndOpacity(LineColour(*Line)).Font(FCoreStyle::GetDefaultFontStyle("Mono", 8))];
 }
 

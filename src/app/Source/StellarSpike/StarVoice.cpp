@@ -241,7 +241,7 @@ void AStarVoice::Tick(float DeltaSeconds)
 			bActed = false;
 			// Show the words as they come only once the wake word is among them, and note when
 			// the command in them last changed.
-			StcVoiceCommand Command;
+			StcVoiceCommand Command{};
 			const bool bWoken = Voice != nullptr && stc_voice_parse(Voice, TCHAR_TO_UTF8(*LastText), TCHAR_TO_UTF8(*WakeWord), &Command) >= 0 && Command.woken != 0;
 			const int32 Action = bWoken ? Command.action : STC_VOICE_NONE;
 			const int64 Star = bWoken ? Command.star_id : -1;
@@ -290,7 +290,7 @@ void AStarVoice::Tick(float DeltaSeconds)
 	}
 	if (bWakeWord && !bTalking && !bAwaitingFinal && !bActed && !LastText.IsEmpty() && Now - LastChange > WakePauseSeconds)
 	{
-		StcVoiceCommand Command;
+		StcVoiceCommand Command{};
 		const bool bParsed = stc_voice_parse(Voice, TCHAR_TO_UTF8(*LastText), TCHAR_TO_UTF8(*WakeWord), &Command) >= 0 && Command.woken != 0;
 		const bool bWokenOnly = bParsed && Command.action == STC_VOICE_NONE && Command.target[0] == '\0';
 		const bool bNoStarYet = bParsed && (Command.action == STC_VOICE_SHOW || Command.action == STC_VOICE_GO_TO) && Command.star_id < 0;
@@ -317,7 +317,7 @@ void AStarVoice::Tick(float DeltaSeconds)
 
 bool AStarVoice::Handle(const FString& Heard, bool bNeedWake, double SpokenEnd)
 {
-	StcVoiceCommand Command;
+	StcVoiceCommand Command{};
 	if (stc_voice_parse(Voice, TCHAR_TO_UTF8(*Heard), bNeedWake ? TCHAR_TO_UTF8(*WakeWord) : "", &Command) < 0)
 	{
 		return false;

@@ -6,6 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-06
+
+See [release_notes/v0.4.1.md](release_notes/v0.4.1.md) for details.
+
+### Fixed
+
+- The app now builds on Windows. The 0.4.0 source compiled on the Mac (Clang) but not on Windows (MSVC), where stricter warnings are treated as errors: two names in the console and a voice command left uninitialised. No change to how the app behaves or looks; the Mac and Vision Pro builds are unaffected.
+
 ## [0.4.0] - 2026-11-06
 
 See [release_notes/v0.4.0.md](release_notes/v0.4.0.md) for details.
@@ -104,7 +112,8 @@ See [release_notes/v0.1.0.md](release_notes/v0.1.0.md) for details.
 
 - The control service carries out a command sent just before the console closes its connection, such as a `quit` piped through `nc`.
 
-[Unreleased]: https://github.com/peterlharding/stellar-explorer/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/peterlharding/stellar-explorer/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.4.1
 [0.4.0]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.4.0
 [0.3.0]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.3.0
 [0.2.1]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.2.1
