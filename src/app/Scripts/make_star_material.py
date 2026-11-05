@@ -24,6 +24,8 @@ PARAMETERS = {
     "BaseSize": 0.0012,
     "Exposure": 0.04,
     "Saturation": 1.6,
+    # Parsecs from the viewer beyond which no star is shown; 0 shows every star (AStarField).
+    "ViewRadius": 0.0,
 }
 
 library = unreal.MaterialEditingLibrary
@@ -155,6 +157,7 @@ def build():
         "UnitsPerParsec": parameters["UnitsPerParsec"],
         "LimitingMag": parameters["LimitingMag"],
         "BaseSize": parameters["BaseSize"],
+        "ViewRadius": parameters["ViewRadius"],
     }
 
     offset = custom(material, "StarOffset", -600, 600, {"Corner": corner, **axes, **common})

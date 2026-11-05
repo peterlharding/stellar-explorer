@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cmath>
 #include <utility>
 
 namespace stellar::core
@@ -43,6 +44,35 @@ namespace stellar::core
 			Phrase{"show panel", VoiceAction::ShowInfo},
 			Phrase{"show details", VoiceAction::ShowInfo},
 			Phrase{"info on", VoiceAction::ShowInfo},
+			// How far out stars are shown: before "show", which they begin.
+			Phrase{"show more stars", VoiceAction::ShowMore},
+			Phrase{"show more", VoiceAction::ShowMore},
+			Phrase{"show further out", VoiceAction::ShowMore},
+			Phrase{"further out", VoiceAction::ShowMore},
+			Phrase{"see more", VoiceAction::ShowMore},
+			Phrase{"show fewer stars", VoiceAction::ShowLess},
+			Phrase{"show less stars", VoiceAction::ShowLess},
+			Phrase{"show fewer", VoiceAction::ShowLess},
+			Phrase{"show less", VoiceAction::ShowLess},
+			Phrase{"see less", VoiceAction::ShowLess},
+			Phrase{"show all the stars", VoiceAction::ShowEverything},
+			Phrase{"show all stars", VoiceAction::ShowEverything},
+			Phrase{"show every star", VoiceAction::ShowEverything},
+			Phrase{"show everything", VoiceAction::ShowEverything},
+			Phrase{"show all", VoiceAction::ShowEverything},
+			Phrase{"no limit", VoiceAction::ShowEverything},
+			Phrase{"show only stars within", VoiceAction::ShowWithin},
+			Phrase{"show stars within", VoiceAction::ShowWithin},
+			Phrase{"show only within", VoiceAction::ShowWithin},
+			Phrase{"show within", VoiceAction::ShowWithin},
+			Phrase{"only within", VoiceAction::ShowWithin},
+			Phrase{"within", VoiceAction::ShowWithin},
+			Phrase{"limit to", VoiceAction::ShowWithin},
+			Phrase{"quit the app", VoiceAction::Quit},
+			Phrase{"exit the app", VoiceAction::Quit},
+			Phrase{"close the app", VoiceAction::Quit},
+			Phrase{"quit", VoiceAction::Quit},
+			Phrase{"exit", VoiceAction::Quit},
 			Phrase{"back off", VoiceAction::BackOff},
 			Phrase{"back up", VoiceAction::BackOff},
 			Phrase{"move back", VoiceAction::BackOff},
@@ -71,6 +101,101 @@ namespace stellar::core
 			Phrase{"look at", VoiceAction::Show},
 			Phrase{"select", VoiceAction::Show},
 		};
+
+		constexpr double kLightYearsPerParsec = 3.26156;
+
+		bool all_digits(const std::string& word)
+		{
+			return !word.empty() && std::all_of(word.begin(), word.end(), [](char c) { return c >= '0' && c <= '9'; });
+		}
+
+		// A distance from words[at] on, as normalised: "20 light years", "6 5 parsecs" (6.5, its
+		// point a space once normalised), "6 point 5 parsecs", "1 000 light years" (1,000), "2
+		// hundred light years", in parsecs; light years if no unit was heard. 0 if no number.
+		// Unit: 0 none heard, 1 light years, 2 parsecs.
+		//
+		// Apple's recogniser often mishears "parsecs": "6 part 6", "6 park", "50 Pacific", "100
+		// Perec", and as a time, "6:06", "6:05", "5 6:00" (all in the headset). So after the number
+		// a word beginning with "p" ("point" and "please" aside) is parsecs, and so is a second
+		// number of two digits beginning with 0, as no one says "six point oh six"; a time anywhere
+		// in the command is dealt with before (has_time).
+		double parse_distance(const std::vector<std::string>& words, std::size_t at, int& unit)
+		{
+			unit = 0;
+			bool as_time = false;
+			double value = 0.0;
+			bool any = false;
+			std::size_t i = at;
+			if (i < words.size() && (words[i] == "a" || words[i] == "about"))
+			{
+				++i;
+			}
+			for (; i < words.size(); ++i)
+			{
+				// "Two" written as it sounds, as Apple's recogniser did in the headset ("within to light years").
+				const std::string& word = !any && (words[i] == "to" || words[i] == "too") ? std::string("2") : words[i];
+				if (all_digits(word))
+				{
+					if (any && word.size() == 3)
+					{
+						value = value * 1000.0 + std::stod(word); // a thousands separator
+					}
+					else if (any && word.size() == 2 && word[0] == '0')
+					{
+						as_time = true; // "6:06": "parsecs" heard as a time
+						++i;
+						break;
+					}
+					else if (any)
+					{
+						value += std::stod(word) / std::pow(10.0, static_cast<double>(word.size())); // a decimal point
+					}
+					else
+					{
+						value = std::stod(word);
+					}
+					any = true;
+				}
+				else if (word == "point" && i + 1 < words.size() && all_digits(words[i + 1]))
+				{
+					value += std::stod(words[i + 1]) / std::pow(10.0, static_cast<double>(words[i + 1].size()));
+					any = true;
+					++i;
+				}
+				else if (word == "hundred" || word == "thousand")
+				{
+					value = (any ? value : 1.0) * (word == "hundred" ? 100.0 : 1000.0);
+					any = true;
+				}
+				else
+				{
+					break;
+				}
+			}
+			if (!any)
+			{
+				return 0.0;
+			}
+			const bool parsecs = as_time || (i < words.size() && words[i][0] == 'p' && words[i] != "point" && words[i] != "please");
+			const bool light_years = i < words.size() &&
+				(words[i] == "ly" || words[i] == "lightyear" || words[i] == "lightyears" ||
+					(words[i] == "light" && i + 1 < words.size() && (words[i + 1] == "year" || words[i + 1] == "years")));
+			unit = parsecs ? 2 : light_years ? 1 : 0;
+			return parsecs ? value : value / kLightYearsPerParsec;
+		}
+
+		// Whether the text, as heard, holds a time ("6:00"): the recogniser's way of writing "parsecs".
+		bool has_time(std::string_view text)
+		{
+			for (std::size_t i = 1; i + 1 < text.size(); ++i)
+			{
+				if (text[i] == ':' && std::isdigit(static_cast<unsigned char>(text[i - 1])) && std::isdigit(static_cast<unsigned char>(text[i + 1])))
+				{
+					return true;
+				}
+			}
+			return false;
+		}
 
 		constexpr std::array<const char*, 20> kUnits{
 			"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
@@ -492,8 +617,24 @@ namespace stellar::core
 		}
 		if (command.action == VoiceAction::LetGo || command.action == VoiceAction::GoThere || command.action == VoiceAction::BackOff ||
 			command.action == VoiceAction::Closer || command.action == VoiceAction::AlignGalactic || command.action == VoiceAction::AlignCelestial ||
-			command.action == VoiceAction::HideInfo || command.action == VoiceAction::ShowInfo)
+			command.action == VoiceAction::HideInfo || command.action == VoiceAction::ShowInfo || command.action == VoiceAction::ShowMore ||
+			command.action == VoiceAction::ShowLess || command.action == VoiceAction::ShowEverything || command.action == VoiceAction::Quit)
 		{
+			return command;
+		}
+		if (command.action == VoiceAction::ShowWithin)
+		{
+			command.radius_parsecs = parse_distance(words, at, command.radius_unit);
+			// A time heard is "parsecs" misheard, and the number is the first said: "five 6:00" is 5 pc.
+			if (has_time(text))
+			{
+				const auto first = std::find_if(words.begin() + static_cast<std::ptrdiff_t>(std::min(at, words.size())), words.end(), all_digits);
+				if (first != words.end())
+				{
+					command.radius_parsecs = std::stod(*first);
+					command.radius_unit = 2;
+				}
+			}
 			return command;
 		}
 		if (command.action == VoiceAction::ReturnToSun)
@@ -510,6 +651,19 @@ namespace stellar::core
 		if (!words.empty() && words.back() == "please")
 		{
 			words.pop_back();
+		}
+		// "Show 20 light years", heard without "within": a distance, with its unit, is no star's name.
+		if (command.action == VoiceAction::Show)
+		{
+			int unit = 0;
+			const double radius = parse_distance(words, at, unit);
+			if (radius > 0.0 && unit != 0)
+			{
+				command.action = VoiceAction::ShowWithin;
+				command.radius_parsecs = radius;
+				command.radius_unit = unit;
+				return command;
+			}
 		}
 		command.target = join(words, at);
 		if (const Entry* entry = match(command.target, commanded))

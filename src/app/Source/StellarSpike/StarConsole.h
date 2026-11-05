@@ -113,6 +113,15 @@ private:
 	double NextState = 0.0;
 
 	bool bFollow = true;
+	/**
+	 * The view radius slider's place (AStarField::ViewFraction), from the app it steers except
+	 * while held; and when it last sent the radius, which it does at most every SliderSendSeconds.
+	 */
+	double SliderValue = 1.0;
+	bool bSliderHeld = false;
+	double NextSliderSend = 0.0;
+	/** Send the slider's radius as a command: "show within ... parsecs", or "show everything". */
+	void SendViewRadius();
 	/** The other app's head, in this app's frame, once a state has come. */
 	TOptional<FVector> HeadsetPosition;
 	FVector HeadsetFacing = FVector::ForwardVector;

@@ -20,9 +20,10 @@ class FLogTap;
  *                     {"command": "quit"}             quits this app, cleanly
  *   to the console    {"type": "result", "command": ..., "text": ...}
  *                     {"type": "state", "position": [x, y, z], "facing": [x, y, z], "up": [x, y, z],
- *                      "kept": ..., "kept_position": [x, y, z], "pointed": ..., "build": ...}
- *                      five times a second;
- *                      position in parsecs and facing a unit vector, both ICRS
+ *                      "kept": ..., "kept_position": [x, y, z], "pointed": ..., "view_radius": ...,
+ *                      "build": ...} five times a second;
+ *                      position in parsecs and facing a unit vector, both ICRS; view_radius
+ *                      how far out stars are shown, in parsecs, 0 for every star
  *                     {"type": "log", "line": ...}     every log line, the last 500 on connecting;
  *                      a warning or an error says so after its category ("LogX: Warning: ...")
  *

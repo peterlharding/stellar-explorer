@@ -31,6 +31,11 @@ namespace
 	constexpr double NearestParsecs = 0.02;
 	/** "Return to the Sun" stops this far from it, so it is in view: about 10,000 AU. */
 	constexpr double SunViewParsecs = 0.05;
+	/**
+	 * "Quit" quits only when said again within this, so a word heard by chance does not. At 5 s,
+	 * in the headset, the second came too late.
+	 */
+	constexpr double QuitConfirmSeconds = 8.0;
 }
 
 AStarActions::AStarActions()
@@ -186,6 +191,38 @@ FString AStarActions::Perform(const StcVoiceCommand& Command, const FString& Hea
 	case STC_VOICE_LET_GO:
 		Pointer->Keep(INDEX_NONE);
 		return TEXT("Let go");
+	case STC_VOICE_SHOW_MORE:
+	case STC_VOICE_SHOW_LESS:
+	{
+		// Twice or half as far out; less, from every star, starts from the furthest radius.
+		const double Radius = StarField->GetViewRadius();
+		if (Command.action == STC_VOICE_SHOW_MORE && Radius <= 0.0)
+		{
+			return TEXT("Every star is shown already");
+		}
+		const double From = Radius > 0.0 ? Radius : AStarField::FurthestViewLightYears / AStarField::LightYearsPerParsec;
+		return SetViewRadius(Command.action == STC_VOICE_SHOW_MORE ? From * 2.0 : From / 2.0);
+	}
+	case STC_VOICE_SHOW_WITHIN:
+		if (Command.radius_parsecs <= 0.0)
+		{
+			return FString::Printf(TEXT("\"%s\": within how far?"), *Heard);
+		}
+		return SetViewRadius(Command.radius_parsecs);
+	case STC_VOICE_SHOW_EVERYTHING:
+		return SetViewRadius(0.0);
+	case STC_VOICE_QUIT:
+	{
+		const double Now = FPlatformTime::Seconds();
+		if (Now - QuitAskedAt > QuitConfirmSeconds)
+		{
+			QuitAskedAt = Now;
+			return TEXT("Say \"quit\" again to exit");
+		}
+		UE_LOG(LogStarActions, Display, TEXT("Quit asked for twice: exiting"));
+		FPlatformMisc::RequestExit(false, TEXT("StarActions"));
+		return TEXT("Quitting");
+	}
 	case STC_VOICE_HIDE_INFO:
 	case STC_VOICE_SHOW_INFO:
 		Pointer->SetInfoShown(Command.action == STC_VOICE_SHOW_INFO);
@@ -208,17 +245,37 @@ FString AStarActions::Perform(const StcVoiceCommand& Command, const FString& Hea
 	}
 	case STC_VOICE_SHOW:
 	case STC_VOICE_GO_TO:
+	{
 		if (Star == INDEX_NONE)
 		{
 			const FString Target = UTF8_TO_TCHAR(Command.target);
 			return Target.IsEmpty() ? FString::Printf(TEXT("\"%s\": which star?"), *Heard) : FString::Printf(TEXT("No star called \"%s\""), *Target);
 		}
-		Face(Star, Command.action == STC_VOICE_GO_TO ? GoNear(Star) : Head);
+		const FVector From = Command.action == STC_VOICE_GO_TO ? GoNear(Star) : Head;
+		Face(Star, From);
 		Pointer->Keep(Star);
-		return FString::Printf(TEXT("%s %s"), Command.action == STC_VOICE_GO_TO ? TEXT("Going to") : TEXT("Showing"), *Name);
+		// Kept, but not shown, when it is further out than the stars shown.
+		const double Radius = StarField->GetViewRadius();
+		const bool bBeyond = Radius > 0.0 && FVector::Distance(From, StarField->GetPosition(Star)) > Radius * AStarField::UnitsPerParsec;
+		return FString::Printf(TEXT("%s %s%s"), Command.action == STC_VOICE_GO_TO ? TEXT("Going to") : TEXT("Showing"), *Name,
+			bBeyond ? TEXT(", beyond the stars shown") : TEXT(""));
+	}
 	default:
 		return FString::Printf(TEXT("\"%s\": not a command"), *Heard);
 	}
+}
+
+bool AStarActions::IsQuitAsked() const
+{
+	return FPlatformTime::Seconds() - QuitAskedAt <= QuitConfirmSeconds;
+}
+
+FString AStarActions::SetViewRadius(double Parsecs)
+{
+	StarField->SetViewRadius(Parsecs);
+	const FString Shown = AStarField::DescribeViewRadius(StarField->GetViewRadius());
+	UE_LOG(LogStarActions, Display, TEXT("%s"), *Shown);
+	return Shown;
 }
 
 FVector AStarActions::GoNear(int32 Star)

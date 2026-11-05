@@ -92,6 +92,50 @@ void AStarField::BeginPlay()
 		}
 	}
 	Mesh->SetMaterial(0, Instance);
+	StarMaterial = Instance;
+	SetViewRadius(ViewRadius);
+}
+
+void AStarField::SetViewRadius(double Parsecs)
+{
+	const double LightYears = Parsecs * LightYearsPerParsec;
+	ViewRadius = Parsecs <= 0.0 || LightYears >= FurthestViewLightYears ? 0.0 : FMath::Max(LightYears, NearestViewLightYears) / LightYearsPerParsec;
+	if (StarMaterial != nullptr)
+	{
+		StarMaterial->SetScalarParameterValue(TEXT("ViewRadius"), static_cast<float>(ViewRadius));
+	}
+}
+
+FString AStarField::DescribeViewRadius(double Parsecs)
+{
+	if (Parsecs <= 0.0)
+	{
+		return TEXT("Every star shown");
+	}
+	// One decimal under 10, none above.
+	const auto Format = [](double Value) { return Value < 10.0 ? FString::Printf(TEXT("%.1f"), Value) : FString::Printf(TEXT("%.0f"), Value); };
+	return FString::Printf(TEXT("Stars within %s ly (%s pc)"), *Format(Parsecs * LightYearsPerParsec), *Format(Parsecs));
+}
+
+double AStarField::ViewFraction(double Parsecs)
+{
+	if (Parsecs <= 0.0)
+	{
+		return 1.0;
+	}
+	const double LightYears = FMath::Clamp(Parsecs * LightYearsPerParsec, NearestViewLightYears, FurthestViewLightYears);
+	return FMath::Loge(LightYears / NearestViewLightYears) / FMath::Loge(FurthestViewLightYears / NearestViewLightYears);
+}
+
+double AStarField::ViewRadiusAt(double Fraction)
+{
+	// The last hundredth of the way is every star, so the end of a slider reaches it.
+	if (Fraction >= 0.99)
+	{
+		return 0.0;
+	}
+	const double LightYears = NearestViewLightYears * FMath::Pow(FurthestViewLightYears / NearestViewLightYears, FMath::Max(Fraction, 0.0));
+	return LightYears / LightYearsPerParsec;
 }
 
 bool AStarField::LoadStars(const FString& Path)
@@ -173,6 +217,8 @@ double AStarField::ApparentMagnitude(double AbsMag, double Distance)
 int32 AStarField::FindStar(const FVector& Origin, const FVector& Direction, double MaxAngleDegrees) const
 {
 	const double MinCosine = FMath::Cos(FMath::DegreesToRadians(MaxAngleDegrees));
+	// Beyond the view radius a star is not shown, so cannot be pointed at.
+	const double Reach = ViewRadius > 0.0 ? ViewRadius * UnitsPerParsec : TNumericLimits<double>::Max();
 	int32 Best = INDEX_NONE;
 	double BestMagnitude = TNumericLimits<double>::Max();
 	for (int32 Star = 0; Star < Positions.Num(); ++Star)
@@ -180,7 +226,7 @@ int32 AStarField::FindStar(const FVector& Origin, const FVector& Direction, doub
 		const FVector ToStar = Positions[Star] - Origin;
 		const double Distance = ToStar.Size();
 		// Nearer than the near clipping plane, a star is not drawn, so cannot be pointed at.
-		if (Distance < GNearClippingPlane || FVector::DotProduct(ToStar, Direction) < MinCosine * Distance)
+		if (Distance < GNearClippingPlane || Distance > Reach || FVector::DotProduct(ToStar, Direction) < MinCosine * Distance)
 		{
 			continue;
 		}

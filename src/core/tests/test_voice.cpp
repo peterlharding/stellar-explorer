@@ -4,6 +4,7 @@
 
 #include "voice.hpp"
 
+#include <cmath>
 #include <cstdio>
 #include <string>
 
@@ -113,6 +114,56 @@ int main()
 	expect(voice, "Stellar show info", VoiceAction::ShowInfo, -1);
 	expect(voice, "show details please", VoiceAction::ShowInfo, -1);
 	expect(voice, "show Sirius", VoiceAction::Show, 32264);
+
+	// How far out stars are shown; "show" alone still names a star.
+	expect(voice, "Stellar show more", VoiceAction::ShowMore, -1);
+	expect(voice, "show more stars please", VoiceAction::ShowMore, -1);
+	expect(voice, "further out", VoiceAction::ShowMore, -1);
+	expect(voice, "show less", VoiceAction::ShowLess, -1);
+	expect(voice, "show fewer stars", VoiceAction::ShowLess, -1);
+	expect(voice, "show everything", VoiceAction::ShowEverything, -1);
+	expect(voice, "show all the stars", VoiceAction::ShowEverything, -1);
+	expect(voice, "show Vega", VoiceAction::Show, 91000);
+	{
+		const auto within = [&voice](const char* heard, double parsecs) {
+			const auto c = voice.parse(heard, "Stellar");
+			check(c.action == VoiceAction::ShowWithin && std::fabs(c.radius_parsecs - parsecs) < 1e-3,
+				std::string("\"") + heard + "\" -> action " + std::to_string(static_cast<int>(c.action)) + ", " + std::to_string(c.radius_parsecs) + " pc");
+		};
+		within("Stellar show within 20 light years", 20.0 / 3.26156);
+		within("Stellar, show within twenty light-years", 20.0 / 3.26156);
+		within("Stellar show stars within 6.5 parsecs", 6.5);
+		within("Stellar only within six point five parsecs", 6.5);
+		within("Stellar show within 1,000 light years", 1000.0 / 3.26156);
+		within("Stellar show within two hundred light years", 200.0 / 3.26156);
+		within("Stellar show within a hundred parsecs", 100.0);
+		within("Stellar show within 50", 50.0 / 3.26156); // no unit heard: light years
+		within("Stellar show within 10 pc", 10.0);
+		within("Stellar show within", 0.0); // no distance heard
+		within("Stella show 20 light years", 20.0 / 3.26156); // heard in the headset, "within" lost
+		within("Stellar show 5 parsecs", 5.0);
+		// "Parsecs" as Apple's recogniser wrote it in the headset.
+		within("Stella Show within six part six", 6.0);
+		within("Stella Show within six Park", 6.0);
+		within("Stella show within 6:05", 6.0);
+		within("Stella within 6:06", 6.0);
+		within("Stellar Show within to light years", 2.0 / 3.26156);
+		within("No Stella show within five 6:00", 5.0);
+		within("Stellar Show within 100 Perec", 100.0);
+		within("Stella show 50 Pacific", 50.0);
+		within("Stellar show within 6 point 5 parsecs", 6.5); // "point" is not parsecs
+		within("Stellar show within 6.5 light years", 6.5 / 3.26156); // a decimal is still one
+		const auto unit = [&voice](const char* heard) { return voice.parse(heard, "Stellar").radius_unit; };
+		check(unit("Stellar show within 5") == 0 && unit("Stellar show within 5 light years") == 1 && unit("Stellar show within 5 parsecs") == 2,
+			"the unit heard, or none");
+	}
+	// Quitting, heard in the headset as both.
+	expect(voice, "Stellar quit", VoiceAction::Quit, -1);
+	expect(voice, "Stellar exit", VoiceAction::Quit, -1);
+	expect(voice, "close the app please", VoiceAction::Quit, -1);
+
+	// A number alone is still no star's name, nor a distance without its unit.
+	expect(voice, "show 5", VoiceAction::Show, -1);
 
 	// Not close enough to anything.
 	expect(voice, "go to the Pleiades", VoiceAction::GoTo, -1); // not Paradys, which sounds a consonant away

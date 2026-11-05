@@ -21,10 +21,16 @@ namespace
 	constexpr double TalkReleaseSeconds = 0.3;
 	/** How long the wake word heard alone waits for the command that follows it. */
 	constexpr double WakeWaitSeconds = 3.0;
+	/**
+	 * "Show within 5", its unit not yet heard, waits this long for one: acted on at once, in
+	 * the headset "five" became light years as "parsecs" was still being said.
+	 */
+	constexpr double UnitWaitSeconds = 1.5;
 
 	/** Spoken without a star's name, so worth biasing the recogniser towards too. */
 	const TCHAR* const CommandPhrases[] = {TEXT("Show"), TEXT("Go to"), TEXT("Go there"), TEXT("Back off"), TEXT("Closer"), TEXT("Return to the Sun"), TEXT("Let go"),
-		TEXT("Hide info"), TEXT("Show info")};
+		TEXT("Hide info"), TEXT("Show info"), TEXT("Show more"), TEXT("Show less"), TEXT("Show everything"), TEXT("Show within"), TEXT("light years"),
+		TEXT("parsecs"), TEXT("Quit")};
 }
 
 AStarVoice::AStarVoice()
@@ -81,6 +87,13 @@ void AStarVoice::StartListening()
 	for (const TCHAR* Phrase : CommandPhrases)
 	{
 		Hints.Add(Phrase);
+	}
+	// Distances as said after "show within": "parsecs" alone was not enough, and in the headset
+	// "within 6 parsecs" was written "within 6:06", read as a time.
+	for (const int32 Count : {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 50, 100})
+	{
+		Hints.Add(FString::Printf(TEXT("within %d parsecs"), Count));
+		Hints.Add(FString::Printf(TEXT("within %d light years"), Count));
 	}
 	if (bWakeWord)
 	{
@@ -232,10 +245,14 @@ void AStarVoice::Tick(float DeltaSeconds)
 			const bool bWoken = Voice != nullptr && stc_voice_parse(Voice, TCHAR_TO_UTF8(*LastText), TCHAR_TO_UTF8(*WakeWord), &Command) >= 0 && Command.woken != 0;
 			const int32 Action = bWoken ? Command.action : STC_VOICE_NONE;
 			const int64 Star = bWoken ? Command.star_id : -1;
-			if (Action != LastAction || Star != LastStar)
+			const double Radius = bWoken ? Command.radius_parsecs : 0.0;
+			const int32 Unit = bWoken ? Command.radius_unit : 0;
+			if (Action != LastAction || Star != LastStar || Radius != LastRadius || Unit != LastUnit)
 			{
 				LastAction = Action;
 				LastStar = Star;
+				LastRadius = Radius;
+				LastUnit = Unit;
 				CommandSince = Now;
 			}
 			if (bWoken)
@@ -260,9 +277,12 @@ void AStarVoice::Tick(float DeltaSeconds)
 	// Whatever is acted on or ignored, the next utterance starts afresh.
 	// But a complete command is acted on once it has stood a moment, though words go on: in a
 	// room with other people talking the words may not stop for a long time.
+	// "Show within" is complete once it has its distance; without a unit yet, it waits a while for one.
 	const bool bNamed = LastAction == STC_VOICE_SHOW || LastAction == STC_VOICE_GO_TO;
-	const bool bComplete = LastAction != STC_VOICE_NONE && (!bNamed || LastStar >= 0);
-	if (bWakeWord && !bTalking && !bAwaitingFinal && !bActed && bComplete && Now - CommandSince > (bNamed ? WakePauseSeconds : CommandPauseSeconds))
+	const bool bWithin = LastAction == STC_VOICE_SHOW_WITHIN;
+	const bool bComplete = LastAction != STC_VOICE_NONE && (!bNamed || LastStar >= 0) && (!bWithin || LastRadius > 0.0);
+	const double Pause = bNamed ? WakePauseSeconds : bWithin && LastUnit == 0 ? UnitWaitSeconds : CommandPauseSeconds;
+	if (bWakeWord && !bTalking && !bAwaitingFinal && !bActed && bComplete && Now - CommandSince > Pause)
 	{
 		bActed = true;
 		Handle(LastText, true, CommandSince);
@@ -274,7 +294,9 @@ void AStarVoice::Tick(float DeltaSeconds)
 		const bool bParsed = stc_voice_parse(Voice, TCHAR_TO_UTF8(*LastText), TCHAR_TO_UTF8(*WakeWord), &Command) >= 0 && Command.woken != 0;
 		const bool bWokenOnly = bParsed && Command.action == STC_VOICE_NONE && Command.target[0] == '\0';
 		const bool bNoStarYet = bParsed && (Command.action == STC_VOICE_SHOW || Command.action == STC_VOICE_GO_TO) && Command.star_id < 0;
-		if ((bWokenOnly || bNoStarYet) && Now - LastChange < WakeWaitSeconds)
+		const bool bNoDistanceYet = bParsed && Command.action == STC_VOICE_SHOW_WITHIN && Command.radius_parsecs <= 0.0;
+		const bool bNoUnitYet = bParsed && Command.action == STC_VOICE_SHOW_WITHIN && Command.radius_unit == 0;
+		if (((bWokenOnly || bNoStarYet || bNoDistanceYet) && Now - LastChange < WakeWaitSeconds) || (bNoUnitYet && Now - LastChange < UnitWaitSeconds))
 		{
 			ShowLine(TEXT("Listening..."), true, 0.0);
 		}
@@ -300,7 +322,9 @@ bool AStarVoice::Handle(const FString& Heard, bool bNeedWake, double SpokenEnd)
 	{
 		return false;
 	}
-	if (bNeedWake && Command.woken == 0)
+	// Asked to say "quit" again, the wearer says just that: no wake word needed.
+	const bool bConfirmingQuit = Command.action == STC_VOICE_QUIT && Actions->IsQuitAsked();
+	if (bNeedWake && Command.woken == 0 && !bConfirmingQuit)
 	{
 		UE_LOG(LogStarVoice, Display, TEXT("Voice: heard \"%s\" without the wake word: ignored"), *Heard);
 		// Said like a command, it was likely meant as one: say why nothing happened.
@@ -323,6 +347,8 @@ void AStarVoice::NextUtterance()
 	LastText.Reset();
 	bActed = false;
 	LastAction = STC_VOICE_NONE;
+	LastRadius = 0.0;
+	LastUnit = 0;
 	LastStar = -1;
 	if (bWakeWord)
 	{

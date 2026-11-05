@@ -4,13 +4,15 @@
 #include "GameFramework/Actor.h"
 #include "StarField.generated.h"
 
+class UMaterialInstanceDynamic;
 class UProceduralMeshComponent;
 
 /**
  * Every star in catalogue.sqlite as one mesh: four vertices per star, all at the
  * star's position. The material (Scripts/make_star_material.py) turns each four
  * into a camera-facing sprite whose size and brightness follow from the star's
- * absolute magnitude and its distance from the camera.
+ * absolute magnitude and its distance from the camera. Only the stars within the view
+ * radius of the viewer are shown, when one is set (SetViewRadius).
  */
 UCLASS()
 class AStarField : public AActor
@@ -34,6 +36,27 @@ public:
 	static constexpr float DesktopExposure = 0.1f;
 
 	int32 GetStarCount() const { return StarCount; }
+
+	static constexpr double LightYearsPerParsec = 3.26156;
+	/** The view radius goes no nearer than this; past the furthest, every star is shown. */
+	static constexpr double NearestViewLightYears = 1.0;
+	static constexpr double FurthestViewLightYears = 5000.0;
+
+	/**
+	 * Show only the stars within Parsecs of the viewer, the outer tenth fading; 0, or past
+	 * FurthestViewLightYears, shows every star. Pointing passes over those not shown.
+	 */
+	void SetViewRadius(double Parsecs);
+	/** The view radius in parsecs; 0 when every star is shown. */
+	double GetViewRadius() const { return ViewRadius; }
+	/** The view radius as the viewer reads it: "Every star shown", "Stars within 20 ly (6.1 pc)". */
+	static FString DescribeViewRadius(double Parsecs);
+	/**
+	 * Where a view radius sits on a slider, 0 to 1, evenly by ratio from NearestViewLightYears
+	 * to FurthestViewLightYears, 1 for every star; and the view radius at a place on it.
+	 */
+	static double ViewFraction(double Parsecs);
+	static double ViewRadiusAt(double Fraction);
 
 	/**
 	 * The star a ray points at: of the stars within MaxAngleDegrees of the ray, the one
@@ -67,6 +90,11 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UProceduralMeshComponent> Mesh;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> StarMaterial;
+
+	double ViewRadius = 0.0;
 
 	int32 StarCount = 0;
 	FString CataloguePath;

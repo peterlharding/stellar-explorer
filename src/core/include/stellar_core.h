@@ -20,7 +20,7 @@ extern "C" {
 #endif
 
 /* ABI version of this library; a caller checks it matches this header. */
-#define STC_ABI_VERSION 5u
+#define STC_ABI_VERSION 6u
 uint32_t stc_abi_version(void);
 
 /* A position in parsecs, right-handed ICRS equatorial Cartesian. POD, by value. */
@@ -119,7 +119,12 @@ typedef enum StcVoiceAction
 	STC_VOICE_ALIGN_GALACTIC = 8, /* "galactic north": the galactic north pole up on the screen */
 	STC_VOICE_ALIGN_CELESTIAL = 9, /* "celestial north": the celestial north pole up, as at start */
 	STC_VOICE_HIDE_INFO = 10,     /* "hide info": the panel describing the star, hidden until shown */
-	STC_VOICE_SHOW_INFO = 11      /* "show info": the panel shown again */
+	STC_VOICE_SHOW_INFO = 11,     /* "show info": the panel shown again */
+	STC_VOICE_SHOW_MORE = 12,     /* "show more": stars twice as far out shown */
+	STC_VOICE_SHOW_LESS = 13,     /* "show less": only stars half as far out shown */
+	STC_VOICE_SHOW_WITHIN = 14,   /* "show within 20 light years" (or parsecs): radius_parsecs set, 0 if no distance was heard */
+	STC_VOICE_SHOW_EVERYTHING = 15, /* "show everything": no limit to how far out stars are shown */
+	STC_VOICE_QUIT = 16            /* "quit" or "exit": the app, which asks for it twice */
 } StcVoiceAction;
 
 /* Capacity (including the NUL) of StcVoiceCommand's target: what was heard. */
@@ -132,6 +137,8 @@ typedef struct StcVoiceCommand
 	int64_t star_id;                    /* the star named, as StcStar.id; -1 if none was named or none matched */
 	char name[STC_NAME_CAP];            /* the name matched, as the catalogue writes it; empty if none */
 	char target[STC_VOICE_TARGET_CAP];  /* the words heard where a star's name belongs, normalised; may be empty */
+	double radius_parsecs;              /* for STC_VOICE_SHOW_WITHIN, the distance heard, in parsecs; 0 if none */
+	int32_t radius_unit;                /* its unit as heard: 0 none (light years taken), 1 light years, 2 parsecs */
 } StcVoiceCommand;
 
 /* Read the names from an open catalogue; NULL on error. The catalogue may be closed after. */
