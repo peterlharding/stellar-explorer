@@ -30,7 +30,7 @@ namespace
 	/** Spoken without a star's name, so worth biasing the recogniser towards too. */
 	const TCHAR* const CommandPhrases[] = {TEXT("Show"), TEXT("Go to"), TEXT("Go there"), TEXT("Back off"), TEXT("Closer"), TEXT("Return to the Sun"), TEXT("Let go"),
 		TEXT("Hide info"), TEXT("Show info"), TEXT("Show more"), TEXT("Show less"), TEXT("Show everything"), TEXT("Show within"), TEXT("light years"),
-		TEXT("parsecs"), TEXT("Quit")};
+		TEXT("parsecs"), TEXT("Quit"), TEXT("Backtrack")};
 }
 
 AStarVoice::AStarVoice()

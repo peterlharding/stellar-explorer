@@ -68,6 +68,12 @@ namespace stellar::core
 			Phrase{"only within", VoiceAction::ShowWithin},
 			Phrase{"within", VoiceAction::ShowWithin},
 			Phrase{"limit to", VoiceAction::ShowWithin},
+			// After "back to the sun", which "go back to the sun" ends with.
+			Phrase{"backtrack", VoiceAction::Backtrack},
+			Phrase{"back track", VoiceAction::Backtrack},
+			Phrase{"take me back", VoiceAction::Backtrack},
+			Phrase{"go back", VoiceAction::Backtrack},
+			Phrase{"undo", VoiceAction::Backtrack},
 			Phrase{"quit the app", VoiceAction::Quit},
 			Phrase{"exit the app", VoiceAction::Quit},
 			Phrase{"close the app", VoiceAction::Quit},
@@ -618,7 +624,8 @@ namespace stellar::core
 		if (command.action == VoiceAction::LetGo || command.action == VoiceAction::GoThere || command.action == VoiceAction::BackOff ||
 			command.action == VoiceAction::Closer || command.action == VoiceAction::AlignGalactic || command.action == VoiceAction::AlignCelestial ||
 			command.action == VoiceAction::HideInfo || command.action == VoiceAction::ShowInfo || command.action == VoiceAction::ShowMore ||
-			command.action == VoiceAction::ShowLess || command.action == VoiceAction::ShowEverything || command.action == VoiceAction::Quit)
+			command.action == VoiceAction::ShowLess || command.action == VoiceAction::ShowEverything || command.action == VoiceAction::Quit ||
+			command.action == VoiceAction::Backtrack)
 		{
 			return command;
 		}

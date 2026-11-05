@@ -6,6 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- "Stellar, backtrack" (or "go back", "take me back", "undo"): back to where the last journey began, with the star kept then kept again; said again, to where the one before began, for up to 50 journeys. Journeys are "go to", "go there", "back off", "closer" and "return to the Sun", by voice, the menus or the console, which has a Backtrack button.
+
+### Changed
+
+- The core's interface version is 7: rebuild the core libraries after pulling (`scripts/make_macos.sh`, and `build-msvc` on Windows).
+
 ## [0.3.0] - 2026-11-05
 
 See [release_notes/v0.3.0.md](release_notes/v0.3.0.md) for details.
