@@ -18,6 +18,8 @@ Each entry says where the idea came from and which phase it most likely belongs 
   Controlled by a slider on both headsets, a two-handed stretch on the Vision Pro, and the trackpad on the Vive.
   From PLH, 30 October 2026; see [notes/2026-10-30-DIRECTION.md](notes/2026-10-30-DIRECTION.md#f2-a-radius-of-visibility).
   Phase 2.
+  Under way since 5 November 2026: centred on the viewer, with a soft edge, set by a slider on the Vision Pro's hand menu and in the desktop console, a two-handed stretch, and voice ("show within 20 light years", "show more", "show less", "show everything").
+  Still to do: the count of stars inside, other centres, the faintest magnitude alongside, and the Vive's trackpad.
 
 - **Galactic orientation.** A galactic longitude and latitude grid, red, on and off, with the galactic equator, poles and centre marked; an axis triad showing the galactic axes, on the wrist of the hand that does not point (Vision Pro) or on that hand's controller (Vive).
   The same mechanism gives equatorial and ecliptic grids.
@@ -69,11 +71,22 @@ Each entry says where the idea came from and which phase it most likely belongs 
   A spike first, after the Vive spike, to settle recognition, offline or online, and how listening starts; the feature itself in phase 4, after the named actions exist.
   The spike, under way since 2 November 2026: Apple's recogniser works on the Mac and the Vision Pro, offline, by wake word in the headset; star names are the weak spot, and "go there" to the star pointed at works every time ([VOICE.md](../spikes/unreal-stars/VOICE.md)).
 
+- **Teaching the recogniser "parsecs".** Apple's recogniser does not know the word: in the headset it wrote "6:06", "6:00", "six part six", "Park", "Pacific" and "Perec" for it, and right only about half the time even told of phrases such as "within 6 parsecs".
+  The parser now reads those as parsecs, and light years always work, but each session brings new mishearings.
+  The fix is a custom language model (`SFCustomLanguageModelData`, on the Mac and visionOS), with templates for "show within <number> parsecs" and the commands, prepared once and given to each recognition request.
+  From PLH, 5 November 2026.
+  With the voice feature, phase 4.
+
 ## Travel
 
 - **Travelling to a star.** Move the viewer to a kept star, by a fade or a fast flight with the view's edges darkened, arriving a little way from it; the Sun marker, its distance, a faint line towards it and "Return to the Sun" as the anchor home; a history with "Back".
   Flight is the default, from a "Go there" button on the panel; built as the first step of phase 5's relativistic bridge view, which adds aberration, Doppler colour and beaming at a chosen fraction of light speed.
   From PLH, 30 October 2026; see [notes/2026-10-30-DIRECTION.md](notes/2026-10-30-DIRECTION.md#f8-travelling-to-a-star).
+  Phase 2.
+
+- **Backtracking.** "Stellar, backtrack" returns to where the viewer was before the last journey ("go to", "go there", "back off", "closer", "return to the Sun"), and again to the one before, as a browser's Back does; the first step of the history above.
+  In the headset PLH said "Stellar, go back" expecting it, which is not a command yet.
+  From PLH, 5 November 2026.
   Phase 2.
 
 ## Capture

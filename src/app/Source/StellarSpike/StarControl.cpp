@@ -323,5 +323,6 @@ TSharedRef<FJsonObject> AStarControl::State() const
 		Message->SetArrayField(TEXT("kept_position"), Icrs(StarField->GetPosition(Kept), AStarField::UnitsPerParsec));
 	}
 	Message->SetStringField(TEXT("pointed"), Pointed != INDEX_NONE ? StarField->GetName(Pointed) : FString());
+	Message->SetNumberField(TEXT("view_radius"), StarField->GetViewRadius());
 	return Message;
 }

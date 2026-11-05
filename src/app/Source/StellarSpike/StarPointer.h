@@ -24,6 +24,9 @@ class UTextRenderComponent;
  * star kept the pivot: a click keeps the star under it (on empty sky, lets go), middle-drag
  * orbits, Shift + middle-drag pans, the wheel zooms, "." or F faces it (FDesktopMouse).
  *
+ * How far out stars are shown (AStarField::SetViewRadius) is set by a slider on the hand menu,
+ * or by pinching with both hands and moving them apart (further out) or together (nearer in).
+ *
  * In a headset the panel has a grab bar below it (pinch it and move to carry the panel to
  * another place in the view), with a button beside it that hides the panel. On the Vision Pro
  * a pinch also acts on what the eyes were on as it began (GazePinch): look at a star and pinch
@@ -175,6 +178,10 @@ private:
 	void PressPanel(int32 Part, const FVector& Origin, const FVector& Direction, double Along);
 	/** The hand menu: open and close it by the wrist button, and press its items, with the pointing finger. */
 	void UpdateHandMenu(const FVector& Head, const FRotator& HeadRotation, float DeltaSeconds);
+	/** Show only the stars within Parsecs (0: every star) from the hand menu's slider or the two-hand gesture, saying so above the panel. */
+	void SetViewRadius(double Parsecs);
+	/** Both hands pinched and moved apart or together: the view radius follows. */
+	void UpdateResize(int32 Pinched, float DeltaSeconds);
 	/** Close the hand menu, logging where the fingertip went while it was open. */
 	void CloseHandMenu();
 	/** The label of an item of the actions list and the hand menu: "Hide info" or "Show info" as it is. */
@@ -309,6 +316,19 @@ private:
 	UPROPERTY()
 	TArray<TObjectPtr<UTextRenderComponent>> HandItems;
 
+	/** Under the hand menu's buttons, the slider for how far out stars are shown, and what it is set to. */
+	UPROPERTY()
+	TObjectPtr<UProceduralMeshComponent> HandSliderTrack;
+
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> HandSliderKnob;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> HandSliderKnobMaterial;
+
+	UPROPERTY()
+	TObjectPtr<UTextRenderComponent> HandSliderLabel;
+
 	/** Under the hand menu: a bar to move it by, and beside it a button that closes it. */
 	UPROPERTY()
 	TObjectPtr<UProceduralMeshComponent> HandBar;
@@ -429,6 +449,23 @@ private:
 	double GazeMoveGain = 1.0;
 	/** A pinch the system reports twice begins twice: the second within GazeEchoSeconds is ignored. */
 	double GazeEchoUntil = 0.0;
+	/** The fingertip is on the hand menu's slider, setting how far out stars are shown. */
+	bool bSliderTouched = false;
+	/**
+	 * Both hands pinched: how far apart the fingertips were, and the view radius, as it began;
+	 * moved apart or together by ResizeStart, the view radius follows, and they no longer quit.
+	 */
+	bool bBothWerePinched = false;
+	bool bResizing = false;
+	/** When each hand's pinch began (0 left, 1 right), as seen here; negative while not pinched. */
+	double PinchBegan[2] = {-1.0, -1.0};
+	/** When both hands were last seen pinched together, from; the fingertips' distance, smoothed. */
+	double BothPinchedSince = 0.0;
+	double ResizeGap = 0.0;
+	/** Whether the distance and radius to resize from have been taken, ResizeArmSeconds in. */
+	bool bResizeArmed = false;
+	double ResizeFromGap = 0.0;
+	double ResizeFromRadius = 0.0;
 	/** For the log, while the menu shows: the nearest the fingertip came to it, and where, in its frame. */
 	double FingerNearest = TNumericLimits<double>::Max();
 	FVector FingerNearestAt = FVector::ZeroVector;

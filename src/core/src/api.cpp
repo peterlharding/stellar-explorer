@@ -111,6 +111,8 @@ extern "C"
 		out->star_id = command.star_id;
 		copy_field(out->name, command.name);
 		copy_field(out->target, command.target);
+		out->radius_parsecs = command.radius_parsecs;
+		out->radius_unit = command.radius_unit;
 		return out->action;
 	}
 

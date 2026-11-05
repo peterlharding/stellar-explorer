@@ -17,4 +17,4 @@ const float Knee = 0.5;
 const float CoreLimit = 0.85;
 float Peak = max(Centre.r, max(Centre.g, Centre.b));
 float Eased = Peak <= Knee ? Peak : Knee + (CoreLimit - Knee) * (1.0 - exp(-(Peak - Knee) / (CoreLimit - Knee)));
-return Centre * (Eased / max(Peak, 1e-6)) * Profile;
+return Centre * (Eased / max(Peak, 1e-6)) * Profile * Shown;
