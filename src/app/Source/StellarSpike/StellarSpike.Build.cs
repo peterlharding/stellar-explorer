@@ -23,8 +23,10 @@ public class StellarSpike : ModuleRules
 		}
 		if (Target.Platform == UnrealTargetPlatform.VisionOS)
 		{
-			// VisionOSStartup.cpp calls the engine's IOSSceneDelegate.
+			// VisionOSStartup.cpp calls the engine's IOSSceneDelegate, and GazePinch.cpp its app delegate.
 			PrivateDependencyModuleNames.Add("ApplicationCore");
+			// VisionOS/GazePinch.swift asks the system for look-and-pinch; this header is what it sees of the C++.
+			SwiftInteropHeader = System.IO.Path.Combine(ModuleDirectory, "VisionOS/GazePinchBridge.h");
 		}
 	}
 }

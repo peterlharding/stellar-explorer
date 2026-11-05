@@ -9,6 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 
 - On the Vision Pro, a hand menu: touch the button on the back of the other hand's wrist with the pointing hand's index finger, and a column of buttons opens beside it, pressed the same way: Go there, Back off, Closer, Return to the Sun, Let go, and Hide info or Show info. A dot shows where the fingertip is. The menu stays where it opened, upright and facing the viewer, until the wrist button is touched again. (Not the palm turned up, which brings up visionOS's Home button.)
+- On the Vision Pro, look and pinch: look at a star and pinch to keep it, at a hand menu button to press it, or at the panel, its bar or the hand menu's bar and pinch and move the hand to move it, as visionOS's own windows work.
+- A button beside the panel's bar that hides the panel, and under the hand menu a bar to move it by and a button that closes it, pressed by look and pinch (or, under the hand menu, by a touch).
 - "Hide info" and "Show info", spoken, typed in the console, on its buttons, or on the menus: the panel describing the star stays hidden until shown again. Also "hide the panel", "show details" and other ways of saying it.
 
 ### Changed
