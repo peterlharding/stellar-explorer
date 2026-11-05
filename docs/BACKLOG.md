@@ -85,9 +85,10 @@ Each entry says where the idea came from and which phase it most likely belongs 
   Phase 2.
 
 - **Backtracking.** "Stellar, backtrack" returns to where the viewer was before the last journey ("go to", "go there", "back off", "closer", "return to the Sun"), and again to the one before, as a browser's Back does; the first step of the history above.
-  In the headset PLH said "Stellar, go back" expecting it, which is not a command yet.
+  In the headset PLH said "Stellar, go back" expecting it.
   From PLH, 5 November 2026.
   Phase 2.
+  Done on 5 November 2026 for the named journeys, by voice and the console's button; still to do: the mouse's moves on the desktop. In the headset it is by voice only: no button on the hand menu, by PLH's choice.
 
 ## Capture
 

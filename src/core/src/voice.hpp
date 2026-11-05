@@ -30,6 +30,7 @@ namespace stellar::core
 		ShowWithin = 14,
 		ShowEverything = 15,
 		Quit = 16,
+		Backtrack = 17,
 	};
 
 	struct VoiceCommand

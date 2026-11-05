@@ -36,6 +36,8 @@ namespace
 	 * in the headset, the second came too late.
 	 */
 	constexpr double QuitConfirmSeconds = 8.0;
+	/** "Backtrack" goes back this many journeys at most. */
+	constexpr int32 HistoryLength = 50;
 }
 
 AStarActions::AStarActions()
@@ -211,6 +213,24 @@ FString AStarActions::Perform(const StcVoiceCommand& Command, const FString& Hea
 		return SetViewRadius(Command.radius_parsecs);
 	case STC_VOICE_SHOW_EVERYTHING:
 		return SetViewRadius(0.0);
+	case STC_VOICE_BACKTRACK:
+	{
+		if (History.IsEmpty())
+		{
+			return TEXT("Nowhere to go back to");
+		}
+		// Where the last journey began, with the star kept then kept again, and on the desktop
+		// facing as then; not itself a journey, so a second goes further back.
+		const FWaypoint Back = History.Pop();
+		MoveHeadWithoutHistory(Back.Head);
+		Pointer->Keep(Back.Kept);
+		if (!(GEngine->XRSystem.IsValid() && GEngine->XRSystem->IsHeadTrackingAllowed()))
+		{
+			GetWorld()->GetFirstPlayerController()->SetControlRotation(Back.Facing);
+		}
+		const FString Where = Back.Kept != INDEX_NONE ? FString::Printf(TEXT("Back to %s"), *StarField->GetName(Back.Kept)) : FString(TEXT("Back where you were"));
+		return History.IsEmpty() ? Where : FString::Printf(TEXT("%s; %d more back"), *Where, History.Num());
+	}
 	case STC_VOICE_QUIT:
 	{
 		const double Now = FPlatformTime::Seconds();
@@ -299,6 +319,19 @@ void AStarActions::Face(int32 Star, const FVector& From)
 }
 
 void AStarActions::MoveHeadTo(const FVector& Target)
+{
+	if (const APlayerController* Player = GetWorld()->GetFirstPlayerController(); Player != nullptr && Player->PlayerCameraManager != nullptr)
+	{
+		if (History.Num() >= HistoryLength)
+		{
+			History.RemoveAt(0);
+		}
+		History.Add({Player->PlayerCameraManager->GetCameraLocation(), Pointer->GetKept(), Player->GetControlRotation()});
+	}
+	MoveHeadWithoutHistory(Target);
+}
+
+void AStarActions::MoveHeadWithoutHistory(const FVector& Target)
 {
 	const APlayerController* Player = GetWorld()->GetFirstPlayerController();
 	APawn* Pawn = Player != nullptr ? Player->GetPawn() : nullptr;
