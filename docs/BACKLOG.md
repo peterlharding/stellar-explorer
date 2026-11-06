@@ -115,6 +115,14 @@ Each entry says where the idea came from and which phase it most likely belongs 
   From the direction discussion, 30 October 2026.
   Phase 4.
 
+## Rendering
+
+- **A darker sky on the Vive.** Looking back at the dense core from out near the edge is washed out on the Vive Pro 2, not the crisp field the Vision Pro shows: the LCD's weaker blacks, Unreal's bloom spreading the faint stars into a haze, and the sheer number of faint stars together.
+  Levers: turn bloom off or down and lift the black point with a camera post-process, and tune the star exposure, size and faintest magnitude for the panel (the `-StarExposure=`, `-StarSize=`, `-LimitingMag=` flags already allow this without a rebuild).
+  Bake the chosen values in as the Vive's defaults, with the post-process tunable by flag.
+  From PLH, 6 November 2026, in the Vive.
+  Phase 3.
+
 ## Known engine limits on Vision Pro
 
 - **Foveation, the system control, the splash window, multiview.** Each needs a change to engine code that the launcher engine ships precompiled.
