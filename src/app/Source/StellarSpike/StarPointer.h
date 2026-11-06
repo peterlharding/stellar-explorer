@@ -33,7 +33,8 @@ class UTextRenderComponent;
  * to keep it, at a button to press it, at the panel or a bar to move it with the hand. The commands needing no star's name (Go there, Back off, ...,
  * Hide info) are on a menu opened and closed by a button on the back of the other hand's wrist,
  * both pressed with the pointing hand's index finger; with controllers instead, on a list opened by a "..."
- * button above the panel. The ray shows whenever it points at the panel, even with a star
+ * button above the panel or by the controller's menu button, its items scrolled through with the
+ * trackpad (the Index's thumbstick) and run by the trackpad's click. The ray shows whenever it points at the panel, even with a star
  * kept. -PanelControls shows them all on the desktop too, to check the layout. The star
  * pointed at is ringed and described in a panel at the bottom right of the view, which follows
  * the head. In a headset the panel goes after a few seconds with nothing pointed at or kept,
@@ -241,6 +242,29 @@ private:
 	UPROPERTY(Config)
 	FString LeftTriggerKey = TEXT("Vive_Left_Trigger_Axis,ValveIndex_Left_Trigger_Axis");
 
+	/**
+	 * The keys the controller's menu button appears as, device-specific like the trigger keys: a
+	 * comma-separated list tried in turn. Pressing it opens and closes the actions list (the same
+	 * list the panel's "..." button opens), so the commands are reached without pointing at the
+	 * panel. -MenuButtonKey= overrides without a rebuild; -LogInput lists every registered key.
+	 */
+	UPROPERTY(Config)
+	FString MenuButtonKey = TEXT("Vive_Left_Menu_Click,Vive_Right_Menu_Click,ValveIndex_Left_B_Click,ValveIndex_Right_B_Click");
+
+	/**
+	 * With the actions list open, the trackpad (the Vive) or thumbstick (the Index) scrolls a
+	 * highlight up and down the items: its vertical axis, device-specific like the trigger keys, a
+	 * comma-separated list polled in turn, the largest magnitude winning. The items are too small
+	 * to aim the ray at, so the list is driven like a list instead. -MenuScrollKey= overrides
+	 * without a rebuild; -LogInput lists every registered key.
+	 */
+	UPROPERTY(Config)
+	FString MenuScrollKey = TEXT("Vive_Left_Trackpad_Y,Vive_Right_Trackpad_Y,ValveIndex_Left_Thumbstick_Y,ValveIndex_Right_Thumbstick_Y");
+
+	/** The trackpad's (or thumbstick's) click, which runs the highlighted item of the actions list. -MenuSelectKey= overrides. */
+	UPROPERTY(Config)
+	FString MenuSelectKey = TEXT("Vive_Left_Trackpad_Click,Vive_Right_Trackpad_Click,ValveIndex_Left_Thumbstick_Click,ValveIndex_Right_Thumbstick_Click");
+
 	/** The pointing hand's ray, drawn as dots. */
 	UPROPERTY()
 	TObjectPtr<UInstancedStaticMeshComponent> Dots;
@@ -405,6 +429,10 @@ private:
 	int32 Aimed = 0;
 	double AimedAlong = 0.0;
 	bool bMenuOpen = false;
+	/** The highlighted item of the actions list while it is open and driven by the controller trackpad, or INDEX_NONE. */
+	int32 MenuCursor = INDEX_NONE;
+	/** The trackpad must return near its centre between scroll steps, so one flick steps once. */
+	bool bMenuScrollArmed = true;
 	/** Carrying the panel by its bar: how far along the ray it was grabbed, and from the panel's centre. */
 	bool bCarrying = false;
 	double CarryAlong = 0.0;
