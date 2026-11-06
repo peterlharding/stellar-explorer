@@ -64,6 +64,12 @@ namespace
 	// the gap between them stops a trigger held near the threshold from flickering.
 	constexpr float TriggerPress = 0.6f;
 	constexpr float TriggerRelease = 0.4f;
+	// Scrolling the actions list with the trackpad or thumbstick: its vertical axis past
+	// MenuScrollStep steps the highlight one item, and must fall back within MenuScrollArm of the
+	// centre before the next step, so one flick (or one push of a thumbstick that springs back)
+	// steps once.
+	constexpr float MenuScrollStep = 0.5f;
+	constexpr float MenuScrollArm = 0.2f;
 	// Angular radius of the rings around a star.
 	constexpr double RingDegrees = 0.7;
 	// The panel: its size, the text heights, and how long it takes to follow the head's
@@ -111,9 +117,11 @@ namespace
 	 * The actions list and the hand menu: the commands that need no star's name, run through
 	 * AStarActions. The last reads "Hide info" or "Show info", as the panel is (MenuLabel).
 	 */
-	const TCHAR* const MenuLabels[] = {TEXT("Go there"), TEXT("Back off"), TEXT("Closer"), TEXT("Return to the Sun"), TEXT("Let go"), TEXT("Hide info")};
+	const TCHAR* const MenuLabels[] = {TEXT("Go there"), TEXT("Back off"), TEXT("Closer"), TEXT("Return to the Sun"), TEXT("Let go"), TEXT("Hide info"), TEXT("Quit")};
 	constexpr int32 MenuCount = UE_ARRAY_COUNT(MenuLabels);
-	constexpr int32 InfoItem = MenuCount - 1;
+	constexpr int32 InfoItem = MenuCount - 2;
+	/** The last item quits the app. A scroll-and-click is deliberate, so it needs no second confirm as a misheard spoken "quit" does. */
+	constexpr int32 QuitItem = MenuCount - 1;
 	constexpr double MenuHeight = MenuCount * ItemHeight + 2.0 * MenuPadding;
 	// Where they sit on the panel (right, up from its centre).
 	constexpr double BarUp = -PanelHeight / 2.0 - BarGap - BarHeight / 2.0;
@@ -629,6 +637,9 @@ void AStarPointer::BeginPlay()
 	FParse::Value(FCommandLine::Get(), TEXT("DoublePinch="), DoublePinchSeconds);
 	FParse::Value(FCommandLine::Get(), TEXT("RightTriggerKey="), RightTriggerKey);
 	FParse::Value(FCommandLine::Get(), TEXT("LeftTriggerKey="), LeftTriggerKey);
+	FParse::Value(FCommandLine::Get(), TEXT("MenuButtonKey="), MenuButtonKey);
+	FParse::Value(FCommandLine::Get(), TEXT("MenuScrollKey="), MenuScrollKey);
+	FParse::Value(FCommandLine::Get(), TEXT("MenuSelectKey="), MenuSelectKey);
 	bLogInput = FParse::Param(FCommandLine::Get(), TEXT("LogInput"));
 	bShowControls = FParse::Param(FCommandLine::Get(), TEXT("PanelControls"));
 	bHandRay |= FParse::Param(FCommandLine::Get(), TEXT("HandRay"));
@@ -657,7 +668,8 @@ void AStarPointer::BeginPlay()
 		for (const FKey& Key : AllKeys)
 		{
 			const FString KeyName = Key.ToString();
-			if (KeyName.Contains(TEXT("Trigger")) || KeyName.Contains(TEXT("MotionController")))
+			if (KeyName.Contains(TEXT("Trigger")) || KeyName.Contains(TEXT("MotionController")) || KeyName.Contains(TEXT("Trackpad")) ||
+				KeyName.Contains(TEXT("Thumbstick")) || KeyName.Contains(TEXT("Joystick")) || KeyName.Contains(TEXT("Menu")))
 			{
 				UE_LOG(LogStarPointer, Display, TEXT("Available input key: %s"), *KeyName);
 			}
@@ -912,6 +924,81 @@ void AStarPointer::Tick(float DeltaSeconds)
 
 	const TArray<FRay, TInlineAllocator<2>> Rays = GetRays(Head, HeadRotation);
 	const double Now = GetWorld()->GetRealTimeSeconds();
+	// The controller's menu button opens and closes the actions list, the same toggle as the
+	// panel's "..." button (PressPanel, PartActions), so the no-star commands are reached without
+	// pointing at the panel. Polled like the trigger (GetRays has just set bUsingControllers);
+	// the keys are device-specific, so each candidate is tried. Edge-triggered: one press, one
+	// toggle. The visibility update clears bMenuOpen if the controllers drop out (bMenuOpen &= bButton).
+	if (bHeadset && bUsingControllers)
+	{
+		TArray<FString> MenuKeys;
+		MenuButtonKey.ParseIntoArray(MenuKeys, TEXT(","));
+		for (const FString& KeyName : MenuKeys)
+		{
+			if (Player->WasInputKeyJustPressed(FKey(*KeyName.TrimStartAndEnd())))
+			{
+				bMenuOpen = !bMenuOpen;
+				UE_LOG(LogStarPointer, Display, TEXT("Menu button [%s]: actions list %s"),
+					*KeyName.TrimStartAndEnd(), bMenuOpen ? TEXT("open") : TEXT("closed"));
+				break;
+			}
+		}
+	}
+	// With the actions list open, the controller's trackpad (the Index's thumbstick) scrolls a
+	// highlight up and down the items, and its click runs the highlighted one: the items are too
+	// small to aim the ray at. Polled like the trigger; the axis and click keys are device-specific,
+	// so each candidate is tried, the largest magnitude winning. The scroll is edge-triggered with a
+	// re-arm (MenuScrollStep / MenuScrollArm), so one flick steps once.
+	if (bHeadset && bUsingControllers && bMenuOpen)
+	{
+		if (MenuCursor == INDEX_NONE)
+		{
+			// Start on the first item; make the pad return to centre before the first step.
+			MenuCursor = 0;
+			bMenuScrollArmed = false;
+		}
+		TArray<FString> ScrollKeys;
+		MenuScrollKey.ParseIntoArray(ScrollKeys, TEXT(","));
+		float Scroll = 0.0f;
+		for (const FString& KeyName : ScrollKeys)
+		{
+			const float Value = Player->GetInputAnalogKeyState(FKey(*KeyName.TrimStartAndEnd()));
+			if (FMath::Abs(Value) > FMath::Abs(Scroll))
+			{
+				Scroll = Value;
+			}
+		}
+		if (bMenuScrollArmed && FMath::Abs(Scroll) >= MenuScrollStep)
+		{
+			// Up the pad (positive) moves towards the first item, which sits at the top of the list.
+			const int32 Step = Scroll > 0.0f ? -1 : 1;
+			MenuCursor = FMath::Clamp(MenuCursor + Step, 0, MenuCount - 1);
+			bMenuScrollArmed = false;
+			UE_LOG(LogStarPointer, Display, TEXT("Menu scroll: item %d (\"%s\")"), MenuCursor, *MenuLabel(MenuCursor));
+		}
+		else if (FMath::Abs(Scroll) <= MenuScrollArm)
+		{
+			bMenuScrollArmed = true;
+		}
+		TArray<FString> SelectKeys;
+		MenuSelectKey.ParseIntoArray(SelectKeys, TEXT(","));
+		for (const FString& KeyName : SelectKeys)
+		{
+			if (Player->WasInputKeyJustPressed(FKey(*KeyName.TrimStartAndEnd())))
+			{
+				const int32 Chosen = MenuCursor;
+				UE_LOG(LogStarPointer, Display, TEXT("Menu select [%s]: item %d (\"%s\")"), *KeyName.TrimStartAndEnd(), Chosen, *MenuLabel(Chosen));
+				bMenuOpen = false;
+				RunMenuItem(Chosen);
+				break;
+			}
+		}
+	}
+	else
+	{
+		MenuCursor = INDEX_NONE;
+		bMenuScrollArmed = true;
+	}
 	UpdateHandMenu(Head, HeadRotation, DeltaSeconds);
 	UseGazePinches(Head);
 	Hovered = INDEX_NONE;
@@ -963,7 +1050,11 @@ void AStarPointer::Tick(float DeltaSeconds)
 			}
 			UE_LOG(LogStarPointer, Display, TEXT("Pinch with hand %d, thumb to index %.1f cm (widest %.1f): pointing at %d now, %d before"), Ray.Hand, Ray.Gap,
 				Widest, Star, Before);
-			if ((PartBefore != PartNone || bMenuOpen) && Now >= GateUntil)
+			// With controllers the trackpad scrolls the list and its click selects, and the menu
+				// button closes it, so the trigger is left free to keep stars even with the list open;
+				// only hands and the desktop close the list by pinching off the panel.
+				const bool bListEatsPinch = bMenuOpen && !bUsingControllers;
+				if ((PartBefore != PartNone || bListEatsPinch) && Now >= GateUntil)
 			{
 				// The panel's, not a star's: pinching off the panel with the list open closes it.
 				UE_LOG(LogStarPointer, Display, TEXT("Pinch on the panel, part %d"), PartBefore);
@@ -1168,6 +1259,13 @@ FString AStarPointer::MenuLabel(int32 Item) const
 
 void AStarPointer::RunMenuItem(int32 Item)
 {
+	if (Item == QuitItem)
+	{
+		UE_LOG(LogStarPointer, Display, TEXT("Menu: \"Quit\": exiting"));
+		ShowNote(TEXT("Quitting"));
+		FPlatformMisc::RequestExit(false, TEXT("StarPointer"));
+		return;
+	}
 	const FString Command = MenuLabel(Item);
 	const FString Result = Actions != nullptr ? Actions->Run(Command) : FString(TEXT("No actions"));
 	UE_LOG(LogStarPointer, Display, TEXT("Menu: \"%s\": %s"), *Command, *Result);
@@ -1948,7 +2046,7 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 	{
 		MenuItems[Item]->SetVisibility(bList);
 		MenuItems[Item]->SetText(FText::FromString(MenuLabel(Item)));
-		MenuItems[Item]->SetTextRenderColor(((Aimed == PartItem + Item ? SelectionColour : DetailsColour) * OverlayBrightness).ToFColor(false));
+		MenuItems[Item]->SetTextRenderColor(((Aimed == PartItem + Item || Item == MenuCursor ? SelectionColour : DetailsColour) * OverlayBrightness).ToFColor(false));
 	}
 
 	if (BothPinchedSeconds > ExitWarnSeconds)
