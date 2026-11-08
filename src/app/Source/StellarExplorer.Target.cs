@@ -1,12 +1,12 @@
 using UnrealBuildTool;
 
-public class StellarSpikeTarget : TargetRules
+public class StellarExplorerTarget : TargetRules
 {
-	public StellarSpikeTarget(TargetInfo Target) : base(Target)
+	public StellarExplorerTarget(TargetInfo Target) : base(Target)
 	{
 		Type = TargetType.Game;
 		DefaultBuildSettings = BuildSettingsVersion.Latest;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
-		ExtraModuleNames.Add("StellarSpike");
+		ExtraModuleNames.Add("StellarExplorer");
 	}
 }

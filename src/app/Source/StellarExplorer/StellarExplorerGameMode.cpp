@@ -1,4 +1,4 @@
-#include "StellarSpikeGameMode.h"
+#include "StellarExplorerGameMode.h"
 
 #include "BuildStamp.h"
 #include "Engine/World.h"
@@ -26,7 +26,7 @@
 #include "stellar_core.h"
 #include "UnrealClient.h"
 
-DEFINE_LOG_CATEGORY_STATIC(LogStellarSpike, Log, All);
+DEFINE_LOG_CATEGORY_STATIC(LogStellarExplorer, Log, All);
 
 namespace
 {
@@ -39,13 +39,13 @@ namespace
 	constexpr double AutopilotDegreesPerSecond = 12.0;
 }
 
-AStellarSpikeGameMode::AStellarSpikeGameMode()
+AStellarExplorerGameMode::AStellarExplorerGameMode()
 {
 	DefaultPawnClass = AStarViewerPawn::StaticClass();
 	PrimaryActorTick.bCanEverTick = true;
 }
 
-void AStellarSpikeGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
+void AStellarExplorerGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
 {
 	// Read here, not in StartPlay: the player's pawn is spawned while the map loads, before StartPlay.
 	bAutopilot = FParse::Param(FCommandLine::Get(), TEXT("Autopilot"));
@@ -65,14 +65,14 @@ void AStellarSpikeGameMode::InitGame(const FString& MapName, const FString& Opti
 	Super::InitGame(MapName, Options, ErrorMessage);
 }
 
-void AStellarSpikeGameMode::StartPlay()
+void AStellarExplorerGameMode::StartPlay()
 {
-	UE_LOG(LogStellarSpike, Display, TEXT("Stellar Explorer: %s"), *StellarBuild());
+	UE_LOG(LogStellarExplorer, Display, TEXT("Stellar Explorer: %s"), *StellarBuild());
 	// The core is a prebuilt library (StellarCore.Build.cs): one built from an older or newer
 	// header than the app was would misread what crosses the boundary, so refuse it.
 	if (stc_abi_version() != STC_ABI_VERSION)
 	{
-		UE_LOG(LogStellarSpike, Error, TEXT("The core library has interface version %u, but the app was built for %u: rebuild the core (src/core/README.md)"),
+		UE_LOG(LogStellarExplorer, Error, TEXT("The core library has interface version %u, but the app was built for %u: rebuild the core (src/core/README.md)"),
 			stc_abi_version(), STC_ABI_VERSION);
 		FPlatformMisc::RequestExit(false, TEXT("StellarCore"));
 		return;
@@ -108,14 +108,14 @@ void AStellarSpikeGameMode::StartPlay()
 	Super::StartPlay();
 }
 
-void AStellarSpikeGameMode::SpawnTestObject()
+void AStellarExplorerGameMode::SpawnTestObject()
 {
 	// 1 m ahead of a headset's starting point and 1.4 m above the floor, about eye height.
 	const FVector Position = HeadsetPosition + FVector(100.0, 0.0, 140.0);
 	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
 	if (Cube == nullptr)
 	{
-		UE_LOG(LogStellarSpike, Error, TEXT("Test object: /Engine/BasicShapes/Cube is not in the package"));
+		UE_LOG(LogStellarExplorer, Error, TEXT("Test object: /Engine/BasicShapes/Cube is not in the package"));
 		return;
 	}
 	AStaticMeshActor* Actor = GetWorld()->SpawnActor<AStaticMeshActor>(Position, FRotator(20.0, 30.0, 0.0));
@@ -127,15 +127,15 @@ void AStellarSpikeGameMode::SpawnTestObject()
 	Light->SetMobility(EComponentMobility::Movable);
 	Light->PointLightComponent->SetIntensity(5000.0f);
 	Light->PointLightComponent->SetAttenuationRadius(500.0f);
-	UE_LOG(LogStellarSpike, Display, TEXT("Test object at %s"), *Position.ToString());
+	UE_LOG(LogStellarExplorer, Display, TEXT("Test object at %s"), *Position.ToString());
 }
 
-void AStellarSpikeGameMode::SpawnSkySphere()
+void AStellarExplorerGameMode::SpawnSkySphere()
 {
 	UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 	if (Material == nullptr)
 	{
-		UE_LOG(LogStellarSpike, Error, TEXT("Sky sphere: /Engine/BasicShapes/BasicShapeMaterial is not in the package"));
+		UE_LOG(LogStellarExplorer, Error, TEXT("Sky sphere: /Engine/BasicShapes/BasicShapeMaterial is not in the package"));
 		return;
 	}
 	// Centred on the head and moved with it (Tick), and larger than the furthest star (8,500 pc)
@@ -183,22 +183,22 @@ void AStellarSpikeGameMode::SpawnSkySphere()
 	const TArray<FProcMeshTangent> NoTangents;
 	Mesh->CreateMeshSection(0, Vertices, Triangles, NoNormals, NoUVs, NoColours, NoTangents, false);
 	Mesh->SetMaterial(0, Material);
-	UE_LOG(LogStellarSpike, Display, TEXT("Sky sphere of radius %.0f pc"), RadiusParsecs);
+	UE_LOG(LogStellarExplorer, Display, TEXT("Sky sphere of radius %.0f pc"), RadiusParsecs);
 }
 
-void AStellarSpikeGameMode::LogCamera() const
+void AStellarExplorerGameMode::LogCamera() const
 {
 	const APlayerController* Player = GetWorld()->GetFirstPlayerController();
 	if (Player && Player->PlayerCameraManager)
 	{
 		const FVector Location = Player->PlayerCameraManager->GetCameraLocation();
 		const FVector Forward = Player->PlayerCameraManager->GetCameraRotation().Vector();
-		UE_LOG(LogStellarSpike, Display, TEXT("Camera at %s (pc), facing %s, FOV %.1f"),
+		UE_LOG(LogStellarExplorer, Display, TEXT("Camera at %s (pc), facing %s, FOV %.1f"),
 			*(Location / AStarField::UnitsPerParsec).ToString(), *Forward.ToString(), Player->PlayerCameraManager->GetFOVAngle());
 	}
 }
 
-APawn* AStellarSpikeGameMode::SpawnDefaultPawnFor_Implementation(AController* NewPlayer, AActor* StartSpot)
+APawn* AStellarExplorerGameMode::SpawnDefaultPawnFor_Implementation(AController* NewPlayer, AActor* StartSpot)
 {
 	const bool bHeadset = GEngine->XRSystem.IsValid() && GEngine->XRSystem->IsHeadTrackingAllowed();
 	// Just off the Sun when looking at the sky from it, so the Sun itself is behind the camera.
@@ -209,7 +209,7 @@ APawn* AStellarSpikeGameMode::SpawnDefaultPawnFor_Implementation(AController* Ne
 		GEngine->XRSystem->SetTrackingOrigin(EHMDTrackingOrigin::LocalFloor);
 		Position = HeadsetPosition;
 		Facing = FRotator::ZeroRotator;
-		UE_LOG(LogStellarSpike, Display, TEXT("Headset: %s"), *GEngine->XRSystem->GetSystemName().ToString());
+		UE_LOG(LogStellarExplorer, Display, TEXT("Headset: %s"), *GEngine->XRSystem->GetSystemName().ToString());
 	}
 	APawn* Pawn = SpawnDefaultPawnAtTransform(NewPlayer, FTransform(Facing, Position));
 	if (AStarViewerPawn* Flyer = Cast<AStarViewerPawn>(Pawn))
@@ -236,7 +236,7 @@ APawn* AStellarSpikeGameMode::SpawnDefaultPawnFor_Implementation(AController* Ne
 	return Pawn;
 }
 
-void AStellarSpikeGameMode::Tick(float DeltaSeconds)
+void AStellarExplorerGameMode::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	Elapsed += DeltaSeconds;
@@ -291,7 +291,7 @@ void AStellarSpikeGameMode::Tick(float DeltaSeconds)
 		{
 			LogCamera();
 			// One file per kind of run, so a later run cannot overwrite another's picture.
-			const TCHAR* Name = bAutopilot ? TEXT("StellarSpike-orbit") : LookAt ? TEXT("StellarSpike-look") : TEXT("StellarSpike-view");
+			const TCHAR* Name = bAutopilot ? TEXT("StellarExplorer-orbit") : LookAt ? TEXT("StellarExplorer-look") : TEXT("StellarExplorer-view");
 			FScreenshotRequest::RequestScreenshot(Name, false, false);
 			bScreenshotRequested = true;
 		}
@@ -302,7 +302,7 @@ void AStellarSpikeGameMode::Tick(float DeltaSeconds)
 	}
 }
 
-void AStellarSpikeGameMode::Finish()
+void AStellarExplorerGameMode::Finish()
 {
 	if (FrameTimes.Num() > 0)
 	{
@@ -310,7 +310,7 @@ void AStellarSpikeGameMode::Finish()
 		Sorted.Sort();
 		const float Median = Sorted[Sorted.Num() / 2];
 		const float Worst1Percent = Sorted[FMath::Min(Sorted.Num() - 1, int32(Sorted.Num() * 0.99))];
-		UE_LOG(LogStellarSpike, Display, TEXT("Frames: %d, stars: %d, median %.2f ms (%.0f fps), 99th percentile %.2f ms, worst %.2f ms"),
+		UE_LOG(LogStellarExplorer, Display, TEXT("Frames: %d, stars: %d, median %.2f ms (%.0f fps), 99th percentile %.2f ms, worst %.2f ms"),
 			Sorted.Num(), StarField ? StarField->GetStarCount() : 0, Median * 1000.0f, 1.0f / Median, Worst1Percent * 1000.0f, Sorted.Last() * 1000.0f);
 	}
 	FPlatformMisc::RequestExit(false, TEXT("QuitAfter"));

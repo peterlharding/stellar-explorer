@@ -49,7 +49,7 @@ void AStarField::BeginPlay()
 	Super::BeginPlay();
 
 	// The repository's catalogue when run from the source tree; the copy staged into the
-	// package (Content/Data, see spike.sh) on a device.
+	// package (Content/Data, see stellar.sh) on a device.
 	FString Path = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectDir(), TEXT("../../data/catalogue.sqlite")));
 	if (!FPaths::FileExists(Path))
 	{

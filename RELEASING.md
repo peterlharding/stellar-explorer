@@ -102,7 +102,7 @@ Work flows one way, `branch → devel → main`. `main` is never merged back int
    - Pipeline: `ruff` formatting and lint, `mypy --strict`, and `pytest` with warnings treated as errors.
    - Catalogue: `make catalogue` then `make gate`, if the release touches the pipeline or its sources.
    - Core: the unit tests, including the fixed reference cases (known star distances, known relativistic travel times, known sky positions at a date).
-   - Front end: the app builds and packages for every target without errors or warnings (`spike.sh build`, `spike.sh package`, and the Windows build).
+   - Front end: the app builds and packages for every target without errors or warnings (`stellar.sh build`, `stellar.sh package`, and the Windows build).
    - Documentation: links between the Markdown files resolve, anchors included.
    - Version fields agree with `VERSION`.
 

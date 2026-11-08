@@ -3,7 +3,7 @@
 The material is a build product: this script and the shader text are what is
 committed. Run it with the editor's command line:
 
-    UnrealEditor-Cmd StellarSpike.uproject -run=pythonscript -script=Scripts/make_star_material.py
+    UnrealEditor-Cmd StellarExplorer.uproject -run=pythonscript -script=Scripts/make_star_material.py
 """
 
 import re
@@ -183,7 +183,7 @@ def build():
 def build_pointer():
     """The pointer's dots and rings: one flat colour, set per use by the Colour parameter.
 
-    Opaque, so the headset's compositor shows it (see SpawnSkySphere in StellarSpikeGameMode.h).
+    Opaque, so the headset's compositor shows it (see SpawnSkySphere in StellarExplorerGameMode.h).
     """
     material = new_material("M_Pointer")
     material.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)

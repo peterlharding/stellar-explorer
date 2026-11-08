@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
-#include "StellarSpikeGameMode.generated.h"
+#include "StellarExplorerGameMode.generated.h"
 
 class AStarField;
 
@@ -21,12 +21,12 @@ class AStarField;
  *                       (see SpawnSkySphere)
  */
 UCLASS()
-class AStellarSpikeGameMode : public AGameModeBase
+class AStellarExplorerGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
 
 public:
-	AStellarSpikeGameMode();
+	AStellarExplorerGameMode();
 
 	/**
 	 * The viewer stays within this of the Sun: the catalogue's edge, from where it is still a

@@ -8,7 +8,7 @@
 #include "GameFramework/PawnMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "StarField.h"
-#include "StellarSpikeGameMode.h"
+#include "StellarExplorerGameMode.h"
 #include "StarPointer.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogStarActions, Log, All);
@@ -164,7 +164,7 @@ FString AStarActions::Perform(const StcVoiceCommand& Command, const FString& Hea
 		double Parsecs = FMath::Max(Away.Size() / AStarField::UnitsPerParsec * (bBack ? DistanceFactor : 1.0 / DistanceFactor), NearestParsecs);
 		// No further out than the game mode lets the viewer go: the catalogue's edge.
 		const FVector Direction = Away.GetSafeNormal();
-		const double Edge = FurthestAlong(Position, Direction, AStellarSpikeGameMode::MaxReachParsecs * AStarField::UnitsPerParsec) / AStarField::UnitsPerParsec;
+		const double Edge = FurthestAlong(Position, Direction, AStellarExplorerGameMode::MaxReachParsecs * AStarField::UnitsPerParsec) / AStarField::UnitsPerParsec;
 		const bool bAtEdge = bBack && Parsecs >= Edge;
 		Parsecs = FMath::Min(Parsecs, Edge);
 		const FVector Target = Position + Direction * Parsecs * AStarField::UnitsPerParsec;

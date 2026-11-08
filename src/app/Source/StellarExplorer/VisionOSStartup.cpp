@@ -61,7 +61,7 @@ namespace
 			return;
 		}
 		NSString* Version = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
-		NSString* Commit = AsNSString(STELLAR_SPIKE_COMMIT);
+		NSString* Commit = AsNSString(STELLAR_EXPLORER_COMMIT);
 		const NSRange Plus = [Commit rangeOfString:@"+"];
 		NSString* Short = Plus.location == NSNotFound ? [Commit substringToIndex:MIN((NSUInteger)7, Commit.length)]
 			: [[Commit substringToIndex:MIN((NSUInteger)7, Plus.location)] stringByAppendingString:[Commit substringFromIndex:Plus.location]];
@@ -75,7 +75,7 @@ namespace
 		UIStackView* Lines = [[UIStackView alloc] initWithArrangedSubviews:@[
 			MakeLabel(@"Stellar Explorer", UIFontTextStyleLargeTitle, [UIColor whiteColor], true),
 			MakeLabel([NSString stringWithFormat:@"Version %@", Version != nil ? Version : @"unknown"], UIFontTextStyleTitle3, [UIColor lightGrayColor], false),
-			MakeLabel([NSString stringWithFormat:@"build %@, %@", Short, AsNSString(STELLAR_SPIKE_BRANCH)], UIFontTextStyleFootnote, [UIColor grayColor], false),
+			MakeLabel([NSString stringWithFormat:@"build %@, %@", Short, AsNSString(STELLAR_EXPLORER_BRANCH)], UIFontTextStyleFootnote, [UIColor grayColor], false),
 		]];
 		Lines.axis = UILayoutConstraintAxisVertical;
 		Lines.alignment = UIStackViewAlignmentCenter;

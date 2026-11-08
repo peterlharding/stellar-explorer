@@ -11,7 +11,7 @@ Relates to [0008](0008-core-in-cpp.md) and [0012](0012-unreal-front-end.md).
 [0012](0012-unreal-front-end.md) makes Unreal the front end; the GDExtension mechanism that [0007](0007-stack-core-sqlite-godot.md) relied on to load the core into Godot is gone with Godot.
 So how the core is consumed has to be decided afresh for Unreal.
 
-Today there is no core. The [spike](../../spikes/unreal-stars/README.md) reads the catalogue with Unreal's own SQLite plugin and does the astrometry inline in the game module (`StarField`, `StellarSpikeGameMode`). Phase 2 of the [plan](../PLAN.md#roadmap) is to extract the core and define the boundary.
+Today there is no core. The [spike](../../spikes/unreal-stars/README.md) reads the catalogue with Unreal's own SQLite plugin and does the astrometry inline in the game module (`StarField`, `StellarExplorerGameMode`). Phase 2 of the [plan](../PLAN.md#roadmap) is to extract the core and define the boundary.
 
 Two facts constrain the choice:
 

@@ -1,8 +1,8 @@
 using UnrealBuildTool;
 
-public class StellarSpike : ModuleRules
+public class StellarExplorer : ModuleRules
 {
-	public StellarSpike(ReadOnlyTargetRules Target) : base(Target)
+	public StellarExplorer(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 		bWarningsAsErrors = true;

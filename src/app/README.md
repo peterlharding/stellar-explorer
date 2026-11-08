@@ -6,20 +6,20 @@ The spike's bring-up — how it reached full immersion on the Vision Pro and the
 
 ## Build and run
 
-`spike.sh` drives the Unreal tools — on a Mac, or on Windows from WSL (it calls the Windows programs with paths translated by `wslpath`). The checkout must be on a Windows drive (`/mnt/c`, `/mnt/d`).
+`stellar.sh` drives the Unreal tools — on a Mac, or on Windows from WSL (it calls the Windows programs with paths translated by `wslpath`). The checkout must be on a Windows drive (`/mnt/c`, `/mnt/d`).
 
 ```sh
 cd /mnt/d/src/Projects/stellar-explorer   # on a Windows drive, not WSL's own filesystem
 make catalogue                            # build data/catalogue.sqlite (once)
 cd src/app
-./spike.sh build && ./spike.sh material   # compile the editor target; generate the star material
-./spike.sh run                            # the catalogue in a window: click a star, drag to look, scroll to move; Tab for the console
-./spike.sh console HOST                   # the same, its console panel steering the app on HOST (a headset)
-./spike.sh vive                           # run in the headset (Windows, through SteamVR/VIVE runtime)
-./spike.sh package                        # cook a standalone Win64 build (ships shaders; no first-run wait)
+./stellar.sh build && ./stellar.sh material   # compile the editor target; generate the star material
+./stellar.sh run                            # the catalogue in a window: click a star, drag to look, scroll to move; Tab for the console
+./stellar.sh console HOST                   # the same, its console panel steering the app on HOST (a headset)
+./stellar.sh vive                           # run in the headset (Windows, through SteamVR/VIVE runtime)
+./stellar.sh package                        # cook a standalone Win64 build (ships shaders; no first-run wait)
 ```
 
-`./spike.sh` with no argument lists every command (`measure`, `look`, `visionos`, `install`, …). `UE_ROOT` overrides where the engine is.
+`./stellar.sh` with no argument lists every command (`measure`, `look`, `visionos`, `install`, …). `UE_ROOT` overrides where the engine is.
 
 ## Data and the core
 
@@ -29,4 +29,4 @@ The app reads `data/catalogue.sqlite` (built by the pipeline in `src/pipeline`) 
 
 ## Naming
 
-The Unreal project and module are still called `StellarSpike` (the `.uproject`, the `Source/StellarSpike/` module, the game classes), carried over from the spike. Renaming them is a separate, optional step, kept apart from the graduation to avoid churn.
+The Unreal project, module and game classes are named `StellarExplorer` — the `.uproject`, the `Source/StellarExplorer/` module, `AStellarExplorerGameMode` and the rest — matching the app and the repository. They were renamed from the `StellarSpike` of the original spike on 8 November 2026; the build script is `stellar.sh`.
