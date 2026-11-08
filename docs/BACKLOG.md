@@ -19,7 +19,8 @@ Each entry says where the idea came from and which phase it most likely belongs 
   From PLH, 30 October 2026; see [notes/2026-10-30-DIRECTION.md](notes/2026-10-30-DIRECTION.md#f2-a-radius-of-visibility).
   Phase 2.
   Under way since 5 November 2026: centred on the viewer, with a soft edge, set by a slider on the Vision Pro's hand menu and in the desktop console, a two-handed stretch, and voice ("show within 20 light years", "show more", "show less", "show everything").
-  Still to do: the count of stars inside, other centres, the faintest magnitude alongside, and the Vive's trackpad.
+  Done on 8 November 2026 for the Vive: a view-radius block the left controller's menu button or grip opens, floating opposite the info panel, with a slider showing the cutoff and the distance in words; the left trackpad slides it (its reading squared for fine control, counted only while the pad is touched so it holds when let go) and the trackpad's click shows every star or the last radius. See [VIVE.md](../spikes/unreal-stars/VIVE.md).
+  Still to do: the count of stars inside, other centres, and the faintest magnitude alongside.
 
 - **Galactic orientation.** A galactic longitude and latitude grid, red, on and off, with the galactic equator, poles and centre marked; an axis triad showing the galactic axes, on the wrist of the hand that does not point (Vision Pro) or on that hand's controller (Vive).
   The same mechanism gives equatorial and ecliptic grids.
