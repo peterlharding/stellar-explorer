@@ -2,10 +2,10 @@
 	"FileVersion": 3,
 	"EngineAssociation": "5.8",
 	"Category": "",
-	"Description": "Spike: can Unreal render the Stellar Explorer catalogue, on the desktop and in the headsets?",
+	"Description": "The Stellar Explorer front end: the catalogue rendered on the desktop and in the headsets.",
 	"Modules": [
 		{
-			"Name": "StellarSpike",
+			"Name": "StellarExplorer",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
 		}

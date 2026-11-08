@@ -298,7 +298,7 @@ void AStarConsole::BuildPanel()
 							.Padding(12.0f)[Column]]];
 	GEngine->GameViewport->AddViewportWidgetContent(Panel.ToSharedRef(), 10);
 	const FString RolePrefix = IsRemote() ? FString::Printf(TEXT("Stellar Explorer: console for %s"), *Host) : FString(TEXT("Stellar Explorer"));
-	Title = FText::FromString(FString::Printf(TEXT("%s %s (build %s, %s)"), *RolePrefix, *StellarVersion(), STELLAR_SPIKE_COMMIT, STELLAR_SPIKE_BRANCH));
+	Title = FText::FromString(FString::Printf(TEXT("%s %s (build %s, %s)"), *RolePrefix, *StellarVersion(), STELLAR_EXPLORER_COMMIT, STELLAR_EXPLORER_BRANCH));
 	FDesktopMouse::SetExcluded(Panel);
 }
 
@@ -313,7 +313,7 @@ void AStarConsole::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	const double Now = FPlatformTime::Seconds();
 
-	// The window says what it is, in place of the engine's "StellarSpike (64-bit Development
+	// The window says what it is, in place of the engine's "StellarExplorer (64-bit Development
 	// ...)". Set as it differs: the engine sets its own after the panel is built.
 	if (GEngine->GameViewport != nullptr)
 	{

@@ -16,9 +16,9 @@ In practice the project is developed and used only on current Apple-silicon Macs
 
 Build for these platforms only:
 
-- **Windows x64** — the desktop build, which also drives the Vive through OpenXR (the same binary, not a separate artefact).
-- **macOS on Apple silicon (arm64)** — the desktop build.
-- **visionOS (arm64)** — the Vision Pro build.
+- **Windows x64** - the desktop build, which also drives the Vive through OpenXR (the same binary, not a separate artefact).
+- **macOS on Apple silicon (arm64)** - the desktop build.
+- **visionOS (arm64)** - the Vision Pro build.
 
 Drop Linux, and drop Intel (x86-64) Macs. arm64 is assumed on the Apple platforms, x64 on Windows.
 
@@ -29,7 +29,7 @@ Drop Linux, and drop Intel (x86-64) Macs. arm64 is assumed on the Apple platform
 
 ## Consequences
 
-- Three binaries — Windows x64, macOS arm64, visionOS — with the Vive folded into the Windows one; a smaller matrix for CI, releases and the headset checks.
+- Three binaries - Windows x64, macOS arm64, visionOS - with the Vive folded into the Windows one; a smaller matrix for CI, releases and the headset checks.
 - The code may assume arm64 on the Apple platforms and need carry no Intel-Mac or Linux build paths.
 - Release artefacts ([RELEASING.md](../../RELEASING.md), step 13), the architecture diagram and the runtime notes list exactly these platforms.
 - Reversible and additive: a Linux desktop build (it would run the Vive through OpenXR, as Windows does) or a universal Mac build can be added later without a redesign.

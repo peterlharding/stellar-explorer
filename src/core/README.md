@@ -6,7 +6,7 @@ The engine-independent core ([ADR 0008](../../docs/decisions/0008-core-in-cpp.md
 
 | Path | What |
 | --- | --- |
-| `include/stellar_core.h` | The public **C ABI** — the whole boundary. Nothing C++/STL/exception crosses it. |
+| `include/stellar_core.h` | The public **C ABI** - the whole boundary. Nothing C++/STL/exception crosses it. |
 | `src/` | Internal C++ (`stellar::core`): astrometry, catalogue access, and the ABI wrappers. |
 | `tests/` | CTest reference cases, run without the engine. |
 | `third_party/sqlite/` | The vendored SQLite amalgamation, compiled in. |
@@ -31,7 +31,7 @@ This is the standalone build the tests run in, and it is part of `make check`.
 
 ## Win64 static library (for Unreal)
 
-The front end is Windows x64 ([ADR 0013](../../docs/decisions/0013-target-platforms.md)) built with MSVC, so the library it links must be MSVC x64. From WSL, drive the Windows CMake and the VS 2022 toolset (the VS generator finds the toolchain itself — no `vcvars` needed):
+The front end is Windows x64 ([ADR 0013](../../docs/decisions/0013-target-platforms.md)) built with MSVC, so the library it links must be MSVC x64. From WSL, drive the Windows CMake and the VS 2022 toolset (the VS generator finds the toolchain itself - no `vcvars` needed):
 
 ```sh
 CMAKE="/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe"
@@ -41,8 +41,8 @@ CMAKE="/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/Common7/IDE/C
 
 This produces, under `src/core/build-msvc/Release/`:
 
-- `stellar_core.lib` — the core
-- `sqlite3.lib` — the vendored SQLite it depends on
+- `stellar_core.lib` - the core
+- `sqlite3.lib` - the vendored SQLite it depends on
 
 The ThirdParty Unreal module links **both** and adds `include/` to its include paths. (Matching Unreal's exact CRT and build flags is settled when that module is wired up.)
 
@@ -78,7 +78,7 @@ cmake --build src/core/build-visionos --config Release
 
 Needs CMake ≥ 3.28 (visionOS support) and the visionOS SDK. Tests are off because their executables are device binaries that cannot run on the host. For the **simulator**, use `-DCMAKE_OSX_SYSROOT=xrsimulator` into `build-visionos-sim/` and wire that path in `StellarCore.Build.cs` when the simulator is targeted.
 
-This is the least-trodden path — expect some iteration — but the C ABI seam ([ADR 0014](../../docs/decisions/0014-core-as-linked-library.md)) means it is only a matter of producing a valid arm64 archive; nothing in the boundary depends on the toolchain.
+This is the least-trodden path - expect some iteration - but the C ABI seam ([ADR 0014](../../docs/decisions/0014-core-as-linked-library.md)) means it is only a matter of producing a valid arm64 archive; nothing in the boundary depends on the toolchain.
 
 ## The boundary
 

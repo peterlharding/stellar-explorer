@@ -1,9 +1,9 @@
 /*
- * Stellar Explorer core — public C ABI.
+ * Stellar Explorer core - public C ABI.
  *
  * The engine-independent core (ADR 0008) is a static library with a C ABI, which
  * the Unreal front end links through a thin C++ wrapper (ADR 0014). This header is
- * the whole boundary: only C — plain functions, POD structs by value — crosses it.
+ * the whole boundary: only C - plain functions, POD structs by value - crosses it.
  * No C++, STL, or exceptions. Memory the core allocates, the core frees.
  *
  * Positions are in parsecs, in the right-handed ICRS equatorial frame (x toward
@@ -52,7 +52,7 @@ typedef struct StcCatalogue StcCatalogue;
 /* Capacities (including the NUL terminator) of the fixed string fields in StcStar.
  * Values longer than this from the catalogue are truncated. Names fit comfortably;
  * spectral types are short (e.g. "M5.5Ve"). Fixed arrays keep StcStar plain data in
- * the caller's buffer — no per-string allocation or lifetime to manage. */
+ * the caller's buffer - no per-string allocation or lifetime to manage. */
 #define STC_NAME_CAP 64
 #define STC_SPECTRAL_CAP 24
 

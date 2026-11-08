@@ -1,15 +1,15 @@
 #!/bin/sh
-# Build and run the Unreal spike on a Mac, or on Windows from WSL.
-#   ./spike.sh build      compile the editor target
-#   ./spike.sh material   generate the star material from Shaders/
-#   ./spike.sh run        fly the catalogue in a window (WASD, right-drag to look)
-#   ./spike.sh measure    circle the Sun for 30 s, log frame times, take a screenshot
-#   ./spike.sh look RA,DEC  screenshot the sky from the Sun, e.g. 5.6,0 for Orion
-#   ./spike.sh vive       run in the headset through SteamVR (Windows)
-#   ./spike.sh console HOST   the desktop app with its console panel steering the app on HOST (a headset)
-#   ./spike.sh package    cook a standalone build so shaders ship (no first-run wait)
-#   ./spike.sh visionos   package for Apple Vision Pro (needs CodeSigningTeam in Config/UserEngine.ini)
-#   ./spike.sh install UDID   install the packaged app on a paired Vision Pro
+# Build and run the Stellar Explorer app on a Mac, or on Windows from WSL.
+#   ./stellar.sh build      compile the editor target
+#   ./stellar.sh material   generate the star material from Shaders/
+#   ./stellar.sh run        fly the catalogue in a window (WASD, right-drag to look)
+#   ./stellar.sh measure    circle the Sun for 30 s, log frame times, take a screenshot
+#   ./stellar.sh look RA,DEC  screenshot the sky from the Sun, e.g. 5.6,0 for Orion
+#   ./stellar.sh vive       run in the headset through SteamVR (Windows)
+#   ./stellar.sh console HOST   the desktop app with its console panel steering the app on HOST (a headset)
+#   ./stellar.sh package    cook a standalone build so shaders ship (no first-run wait)
+#   ./stellar.sh visionos   package for Apple Vision Pro (needs CodeSigningTeam in Config/UserEngine.ini)
+#   ./stellar.sh install UDID   install the packaged app on a paired Vision Pro
 # Under WSL the checkout must be on a Windows drive (/mnt/c, /mnt/d), where Unreal's
 # Windows tools can read it; UE_ROOT overrides where the engine is.
 set -eu
@@ -31,7 +31,7 @@ if grep -qi microsoft /proc/version 2>/dev/null; then
 	case "$HERE" in
 	/mnt/[a-z]/*) ;;
 	*)
-		echo "spike.sh: under WSL the checkout must be on a Windows drive (/mnt/c, /mnt/d), not in $HERE" >&2
+		echo "stellar.sh: under WSL the checkout must be on a Windows drive (/mnt/c, /mnt/d), not in $HERE" >&2
 		exit 1
 		;;
 	esac
@@ -45,7 +45,7 @@ else
 	STAGE=Mac
 	native() { echo "$1"; }
 fi
-PROJECT="$(native "$HERE/StellarSpike.uproject")"
+PROJECT="$(native "$HERE/StellarExplorer.uproject")"
 
 # Write the commit being built into BuildStamp.inl, which the game logs at start, so a log
 # names the code it came from. "+changes" marks a working tree that differs from the commit,
@@ -56,18 +56,18 @@ stamp() {
 	if [ -n "$(git -C "$HERE" status --porcelain)" ]; then
 		COMMIT="$COMMIT+changes"
 	fi
-	STAMP="$HERE/Source/StellarSpike/BuildStamp.inl"
+	STAMP="$HERE/Source/StellarExplorer/BuildStamp.inl"
 	{
-		echo "#define STELLAR_SPIKE_COMMIT TEXT(\"$COMMIT\")"
-		echo "#define STELLAR_SPIKE_BRANCH TEXT(\"${BRANCH:-detached HEAD}\")"
-		echo "#define STELLAR_SPIKE_BUILT TEXT(\"$(date '+%Y-%m-%d %H:%M %z')\")"
+		echo "#define STELLAR_EXPLORER_COMMIT TEXT(\"$COMMIT\")"
+		echo "#define STELLAR_EXPLORER_BRANCH TEXT(\"${BRANCH:-detached HEAD}\")"
+		echo "#define STELLAR_EXPLORER_BUILT TEXT(\"$(date '+%Y-%m-%d %H:%M %z')\")"
 	} > "$STAMP"
 }
 
 # The Mac-only commands, refused elsewhere rather than failing halfway.
 mac_only() {
 	if [ "$PLATFORM" != Mac ]; then
-		echo "spike.sh: $1 needs a Mac with Xcode" >&2
+		echo "stellar.sh: $1 needs a Mac with Xcode" >&2
 		exit 1
 	fi
 }
@@ -75,7 +75,7 @@ mac_only() {
 case "${1:-}" in
 build)
 	stamp
-	"$BUILD_TOOL" StellarSpikeEditor "$PLATFORM" Development -Project="$PROJECT" -WaitMutex
+	"$BUILD_TOOL" StellarExplorerEditor "$PLATFORM" Development -Project="$PROJECT" -WaitMutex
 	;;
 material)
 	"$EDITOR_CMD" "$PROJECT" -run=pythonscript \
@@ -87,7 +87,7 @@ run)
 	;;
 console)
 	# Connects to the control service of the app on $2 (port 47800 unless given as HOST:PORT).
-	"$EDITOR" "$PROJECT" -game -windowed -ResX=1600 -ResY=900 -Console="${2:?usage: ./spike.sh console HOST[:PORT]}"
+	"$EDITOR" "$PROJECT" -game -windowed -ResX=1600 -ResY=900 -Console="${2:?usage: ./stellar.sh console HOST[:PORT]}"
 	;;
 measure)
 	"$EDITOR" "$PROJECT" -game -windowed -ResX=1600 -ResY=900 -Autopilot -QuitAfter=30 \
@@ -106,7 +106,7 @@ package)
 	# compiling them, and it runs without the editor. The catalogue travels as a
 	# plain file in Content/Data (DefaultGame.ini stages it); staging merges into
 	# what is there, so start clean. Needs the generated materials: run
-	# ./spike.sh material first.
+	# ./stellar.sh material first.
 	rm -rf "$HERE/Saved/StagedBuilds/$STAGE" "$HERE/Saved/Archive/$STAGE"
 	stamp
 	mkdir -p "$HERE/Content/Data"
@@ -131,9 +131,9 @@ visionos)
 	;;
 install)
 	mac_only install
-	# The visionOS package only: Saved/Archive also holds the Mac one after ./spike.sh package,
+	# The visionOS package only: Saved/Archive also holds the Mac one after ./stellar.sh package,
 	# and installing that on the headset fails with CoreDeviceError 3002.
-	xcrun devicectl device install app --device "$2" "$HERE/Saved/Archive/VisionOS/StellarSpike.app"
+	xcrun devicectl device install app --device "$2" "$HERE/Saved/Archive/VisionOS/StellarExplorer.app"
 	;;
 *)
 	sed -n '2,12p' "$0"

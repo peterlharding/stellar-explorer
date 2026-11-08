@@ -22,7 +22,7 @@
  * @synchronized (self), since the tap, the recogniser's callbacks and the game thread
  * all reach it.
  */
-@interface StellarSpikeListener : NSObject
+@interface StellarExplorerListener : NSObject
 @property (atomic, copy) NSString* status;
 - (instancetype)initWithPhrases:(NSArray<NSString*>*)phrases;
 - (void)start;
@@ -33,7 +33,7 @@
 - (NSArray<NSArray*>*)drain;
 @end
 
-@implementation StellarSpikeListener
+@implementation StellarExplorerListener
 {
 	NSArray<NSString*>* _phrases;
 	SFSpeechRecognizer* _recognizer;
@@ -262,7 +262,7 @@ namespace
 				{
 					[List addObject:Phrase.GetNSString()];
 				}
-				Listener = [[StellarSpikeListener alloc] initWithPhrases:List];
+				Listener = [[StellarExplorerListener alloc] initWithPhrases:List];
 				[Listener start];
 			}
 		}
@@ -311,7 +311,7 @@ namespace
 		}
 
 	private:
-		StellarSpikeListener* Listener = nil;
+		StellarExplorerListener* Listener = nil;
 		TArray<FHeard> Queue;
 	};
 }

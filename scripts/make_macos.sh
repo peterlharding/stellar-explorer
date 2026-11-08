@@ -4,12 +4,12 @@
 #   scripts/make_macos.sh mac        macOS (arm64) into src/core/build-mac, and run the tests
 #   scripts/make_macos.sh visionos   visionOS (device) into src/core/build-visionos
 # Run it after pulling a change to src/core: the app quits at start on a core built for
-# another interface version. Then build and run the app from src/app with spike.sh
+# another interface version. Then build and run the app from src/app with stellar.sh
 # (build, run, visionos to package); the catalogue must exist first (make catalogue).
 # -----------------------------------------------------------------------------
 set -eu
 
-# The real path, symlinks resolved (pwd -P), as spike.sh uses: the build directories record it.
+# The real path, symlinks resolved (pwd -P), as stellar.sh uses: the build directories record it.
 HERE="$(cd "$(dirname "$0")" && pwd -P)"
 cd "$HERE/.."
 

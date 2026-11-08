@@ -6,6 +6,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-08
+
+See [release_notes/v0.5.1.md](release_notes/v0.5.1.md) for details.
+
+### Changed
+
+- The app is no longer named after the spike it grew from: its Unreal module and targets are `StellarExplorer` and `StellarExplorerEditor`, its source is in `src/app/Source/StellarExplorer`, and `spike.sh` is `stellar.sh`, with the same verbs. After pulling, delete `src/app/Intermediate` and `src/app/Binaries` before building. The Mac app's log is in `~/Library/Logs/StellarExplorer`.
+- On the Vision Pro the app is named "Stellar Explorer" under its icon, rather than "StellarExplorer". Since the rename its bundle id is `io.github.peterlharding.StellarExplorer`, so it installs beside the old StellarSpike app rather than over it: delete that one from the headset.
+
 ## [0.5.0] - 2026-11-08
 
 See [release_notes/v0.5.0.md](release_notes/v0.5.0.md) for details.
@@ -13,8 +22,8 @@ See [release_notes/v0.5.0.md](release_notes/v0.5.0.md) for details.
 ### Added
 
 - Drive the Vive's actions menu from the controller, without pointing at the panel. The right controller's menu button opens the list of commands (Go there, Back off, Closer, Return to the Sun, Let go, Hide info, Quit); scroll it with the trackpad and choose with the trackpad's click, or point the ray at an item and click. Quit is now on the menu, so holding both triggers is no longer the only way out.
-- A visible wand on each Vive controller: a thin rod along the controller's aim, with the ray running on from its tip, so the held hand is easy to keep track of. Dimmer than the ray and colour-coded like a ship's navigation lights — the left hand red for port, the right green for starboard. Its length and thickness are tunable with `-WandLength=` and `-WandRadius=`, and `-NoWand` hides it.
-- A view-radius dial on the Vive's left controller: its menu button or grip opens a block, opposite the star panel, with a slider showing how far out stars are shown and the cutoff in words. The left trackpad slides it — eased for fine control and holding still when you lift off — and the trackpad's click shows every star or returns to the last radius. The Vive now reaches the radius of visibility that the Vision Pro's hand slider and voice already did.
+- A visible wand on each Vive controller: a thin rod along the controller's aim, with the ray running on from its tip, so the held hand is easy to keep track of. Dimmer than the ray and colour-coded like a ship's navigation lights - the left hand red for port, the right green for starboard. Its length and thickness are tunable with `-WandLength=` and `-WandRadius=`, and `-NoWand` hides it.
+- A view-radius dial on the Vive's left controller: its menu button or grip opens a block, opposite the star panel, with a slider showing how far out stars are shown and the cutoff in words. The left trackpad slides it - eased for fine control and holding still when you lift off - and the trackpad's click shows every star or returns to the last radius. The Vive now reaches the radius of visibility that the Vision Pro's hand slider and voice already did.
 
 ### Fixed
 
@@ -124,7 +133,8 @@ See [release_notes/v0.1.0.md](release_notes/v0.1.0.md) for details.
 
 - The control service carries out a command sent just before the console closes its connection, such as a `quit` piped through `nc`.
 
-[Unreleased]: https://github.com/peterlharding/stellar-explorer/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/peterlharding/stellar-explorer/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.5.1
 [0.5.0]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.5.0
 [0.4.1]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.4.1
 [0.4.0]: https://github.com/peterlharding/stellar-explorer/releases/tag/v0.4.0

@@ -1,5 +1,5 @@
 // Between GazePinch.swift and the C++ (GazePinch.cpp), on visionOS: the header Unreal's build
-// tool gives the Swift compiler (SwiftInteropHeader in StellarSpike.Build.cs), so the Swift can
+// tool gives the Swift compiler (SwiftInteropHeader in StellarExplorer.Build.cs), so the Swift can
 // call back with each pinch.
 
 #pragma once

@@ -12,7 +12,7 @@ It is the same C++ code and the same 215 MB SQLite catalogue as the other two ta
 ## 1. Building the catalogue from WSL times out (30 October)
 
 - **Evidence.** `make catalogue` hung fetching the Hipparcos source and failed with a connection timeout (`Errno 110`) to `cdsarc.cds.unistra.fr`; `Test-NetConnection cdsarc.cds.unistra.fr -Port 443` from PowerShell reported `TcpTestSucceeded: False`, while `codeberg.org` succeeded.
-- **What didn't work.** A Windows Firewall outbound rule for the host: PowerShell was not elevated (`New-NetFirewallRule: Access is denied`), and it was moot anyway — `Get-NetFirewallProfile` showed `DefaultOutboundAction` as `NotConfigured`, that is, allowed, so the firewall was not the block.
+- **What didn't work.** A Windows Firewall outbound rule for the host: PowerShell was not elevated (`New-NetFirewallRule: Access is denied`), and it was moot anyway - `Get-NetFirewallProfile` showed `DefaultOutboundAction` as `NotConfigured`, that is, allowed, so the firewall was not the block.
 - **Cause.** The route from this WSL box to the CDS host in Strasbourg, not a firewall: the same build runs on the Mac, which is behind the same external firewall.
 - **What worked.** A mirror. VizieR mirrors the catalogue byte for byte, so the pipeline now tries the primary (`download_url`) and falls back to any `mirror_urls`, here Harvard's `vizier.cfa.harvard.edu` at `/ftp/cats/I/311/hip2.dat.gz`. The sha256 pin confirms the mirror's file is identical, and `make gate` then passed 67/67. (A pipeline fix, committed separately; see `src/pipeline`.)
 
@@ -30,21 +30,21 @@ It is the same C++ code and the same 215 MB SQLite catalogue as the other two ta
 ## 4. The pointer takes the hand path, not the controllers (1–2 November)
 
 - **Symptom.** The app rendered in the headset, but the panel showed the pinch wording and said nothing about the controllers, though a controller was held and tracked.
-- **Cause.** The pointer chose hand tracking because the HTC VIVE runtime reports a *valid hand tracker* even when controllers are in use, and the hand path was tried first — it is all the Vision Pro has.
+- **Cause.** The pointer chose hand tracking because the HTC VIVE runtime reports a *valid hand tracker* even when controllers are in use, and the hand path was tried first - it is all the Vision Pro has.
 - **What worked.** Check the motion controllers first, and use them when either is tracked (`AnyControllerTracked`), falling back to hand tracking only when neither is. The pawn gained left and right `UMotionControllerComponent`s on the `LeftAim` / `RightAim` sources. Gated to Windows, because on the Vision Pro the aim pose comes from the hands and must not be mistaken for a controller. The panel now says "pull the trigger" rather than "pinch" once a controller is seen.
 
 ## 5. The trigger reads zero (2 November)
 
 - **Evidence.** With the controller path taken, pulling the trigger did nothing; the logged trigger value stayed at 0.00.
 - **What didn't work.** The generic `MotionController_Right_TriggerAxis` / `_Left_` keys: they do not exist in Unreal 5.8, so they always read zero.
-- **Cause.** OpenXR delivers a controller's trigger value only when an input action is bound to it, and the key names are device-specific — a Vive wand and a Valve Index controller report different keys. Nothing was bound.
-- **What worked.** Two things together. `Config/Windows/WindowsInput.ini` binds both devices' trigger axes per hand (`Vive_Right_Trigger_Axis` and `ValveIndex_Right_Trigger_Axis` to `PointerTriggerRight`, and the left likewise), under `[/Script/Engine.InputSettings]`. And the pointer polls every candidate key for the hand — a comma-separated list in `RightTriggerKey` / `LeftTriggerKey` — and takes the largest value, with hysteresis around the press threshold (press above 0.6, release below 0.4) so a trigger held near it does not flicker. `-RightTriggerKey=` / `-LeftTriggerKey=` override the keys without a rebuild, and `-LogInput` lists every input key the engine registered, so a new controller's exact key can be found. The trigger then selected stars (μ Per, Capella).
+- **Cause.** OpenXR delivers a controller's trigger value only when an input action is bound to it, and the key names are device-specific - a Vive wand and a Valve Index controller report different keys. Nothing was bound.
+- **What worked.** Two things together. `Config/Windows/WindowsInput.ini` binds both devices' trigger axes per hand (`Vive_Right_Trigger_Axis` and `ValveIndex_Right_Trigger_Axis` to `PointerTriggerRight`, and the left likewise), under `[/Script/Engine.InputSettings]`. And the pointer polls every candidate key for the hand - a comma-separated list in `RightTriggerKey` / `LeftTriggerKey` - and takes the largest value, with hysteresis around the press threshold (press above 0.6, release below 0.4) so a trigger held near it does not flicker. `-RightTriggerKey=` / `-LeftTriggerKey=` override the keys without a rebuild, and `-LogInput` lists every input key the engine registered, so a new controller's exact key can be found. The trigger then selected stars (μ Per, Capella).
 
 ## 6. The wrong hand points (2 November)
 
 - **Symptom.** Selection worked, but with the wrong controller: the held controller was the left, yet the ray stayed on the right, the configured pointing hand.
 - **Cause.** `PointingHand` (right by default) fixed the pointer to a hand whose controller might be asleep on the desk.
-- **What worked.** Point with whichever controller is tracked — the configured hand when its controller is up, otherwise the other — derived from the stable `PointingHand` rather than the mutable pointer index. A single controller now works in either hand. (A first attempt derived the preference from the reassigned pointer index and drifted; fixed.)
+- **What worked.** Point with whichever controller is tracked - the configured hand when its controller is up, otherwise the other - derived from the stable `PointingHand` rather than the mutable pointer index. A single controller now works in either hand. (A first attempt derived the preference from the reassigned pointer index and drifted; fixed.)
 
 ## Harmless and still open
 
