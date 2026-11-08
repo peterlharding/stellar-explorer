@@ -2212,7 +2212,7 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 
 	if (BothPinchedSeconds > ExitWarnSeconds)
 	{
-		Title->SetText(FText::FromString(bUsingControllers ? TEXT("Hold both triggers to exit") : TEXT("Keep pinching to exit")));
+		Title->SetText(FText::FromString(bUsingControllers ? TEXT("Hold both to exit") : TEXT("Keep pinching")));
 		Title->SetTextRenderColor((SelectionColour * OverlayBrightness).ToFColor(false));
 		Details->SetText(FText::FromString(FString::Printf(TEXT("Exiting in %.0f s"), FMath::CeilToDouble(HoldToExitSeconds - BothPinchedSeconds))));
 		Hint->SetText(FText::GetEmpty());
@@ -2248,8 +2248,9 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 		ShowStar(Hovered, HoverColour);
 		return;
 	}
-	Title->SetText(FText::FromString(IsLookOnly()      ? TEXT("Look at a star and pinch")
-			: !bPointingStarted                    ? (bUsingControllers ? TEXT("Pull the trigger to start pointing") : TEXT("Pinch to start pointing"))
+	// Kept short to sit on one line inside the panel's width; the Hint line below carries the detail.
+	Title->SetText(FText::FromString(IsLookOnly()      ? TEXT("Look and pinch")
+			: !bPointingStarted                    ? (bUsingControllers ? TEXT("Pull the trigger") : TEXT("Pinch to point"))
 			: bHeadset                              ? TEXT("Point at a star")
 													: TEXT("Move over a star")));
 	Title->SetTextRenderColor((HintColour * OverlayBrightness).ToFColor(false));
