@@ -3,7 +3,8 @@
 The material is a build product: this script and the shader text are what is
 committed. Run it with the editor's command line:
 
-    UnrealEditor-Cmd StellarExplorer.uproject -run=pythonscript -script=Scripts/make_star_material.py
+    UnrealEditor-Cmd StellarExplorer.uproject -run=pythonscript \
+        -script=Scripts/make_star_material.py
 """
 
 import re
