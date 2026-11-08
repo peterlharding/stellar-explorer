@@ -25,7 +25,9 @@ class UTextRenderComponent;
  * orbits, Shift + middle-drag pans, the wheel zooms, "." or F faces it (FDesktopMouse).
  *
  * How far out stars are shown (AStarField::SetViewRadius) is set by a slider on the hand menu,
- * or by pinching with both hands and moving them apart (further out) or together (nearer in).
+ * or by pinching with both hands and moving them apart (further out) or together (nearer in);
+ * with controllers, by the view-radius dial the left controller's menu button or grip opens, the
+ * trackpad setting the radius and its click turning it off and on.
  *
  * In a headset the panel has a grab bar below it (pinch it and move to carry the panel to
  * another place in the view), with a button beside it that hides the panel. On the Vision Pro
@@ -33,7 +35,8 @@ class UTextRenderComponent;
  * to keep it, at a button to press it, at the panel or a bar to move it with the hand. The commands needing no star's name (Go there, Back off, ...,
  * Hide info) are on a menu opened and closed by a button on the back of the other hand's wrist,
  * both pressed with the pointing hand's index finger; with controllers instead, on a list opened by a "..."
- * button above the panel. The ray shows whenever it points at the panel, even with a star
+ * button above the panel or by the right controller's menu button, its items scrolled through with
+ * the trackpad (the Index's thumbstick) and run by the trackpad's click. The ray shows whenever it points at the panel, even with a star
  * kept. -PanelControls shows them all on the desktop too, to check the layout. The star
  * pointed at is ringed and described in a panel at the bottom right of the view, which follows
  * the head. In a headset the panel goes after a few seconds with nothing pointed at or kept,
@@ -172,6 +175,8 @@ private:
 	void UseMouse(const FVector& Head, const FRotator& HeadRotation);
 	void PlaceRing(UProceduralMeshComponent* Ring, int32 Star, const FVector& Head) const;
 	void PlacePanel(const FVector& Head, const FRotator& HeadRotation, float DeltaSeconds);
+	/** The view-radius block: follow the head like the info panel, and set the slider and text to the radius. */
+	void PlaceRadiusPanel(const FVector& Head, const FRotator& HeadRotation, float DeltaSeconds);
 	/** The part of the panel, its grab bar, its actions button or its list a ray meets, and how far along it. */
 	int32 HitPanel(const FVector& Origin, const FVector& Direction, double& Along) const;
 	/** A pinch on a part of the panel: grab it, open or close the list, or run an item. */
@@ -241,6 +246,49 @@ private:
 	UPROPERTY(Config)
 	FString LeftTriggerKey = TEXT("Vive_Left_Trigger_Axis,ValveIndex_Left_Trigger_Axis");
 
+	/**
+	 * The keys the right controller's menu button appears as, device-specific like the trigger keys:
+	 * a comma-separated list tried in turn. Pressing it opens and closes the actions list (the same
+	 * list the panel's "..." button opens), so the commands are reached without pointing at the panel.
+	 * The left controller's menu button or grip opens the view-radius dial instead (RadiusButtonKey).
+	 * -MenuButtonKey= overrides without a rebuild; -LogInput lists every registered key.
+	 */
+	UPROPERTY(Config)
+	FString MenuButtonKey = TEXT("Vive_Right_Menu_Click,ValveIndex_Right_B_Click");
+
+	/**
+	 * The keys that open the view-radius dial on the left controller, where the trackpad's vertical
+	 * axis sets how far out stars are shown and its click turns the radius off and on. The left menu
+	 * button and the left grip both open it: on some runtimes the left menu button is swallowed and
+	 * never reaches the app (the right one is fine), so the grip is a reliable fallback. Comma-separated
+	 * and device-specific like the others; -RadiusButtonKey= overrides, -LogInput lists registered keys.
+	 */
+	UPROPERTY(Config)
+	FString RadiusButtonKey = TEXT("Vive_Left_Menu_Click,Vive_Left_Grip_Click,ValveIndex_Left_B_Click,ValveIndex_Left_Grip_Click");
+
+	/**
+	 * With the actions list open, the trackpad (the Vive) or thumbstick (the Index) scrolls a
+	 * highlight up and down the items: its vertical axis, device-specific like the trigger keys, a
+	 * comma-separated list polled in turn, the largest magnitude winning. The items are too small
+	 * to aim the ray at, so the list is driven like a list instead. -MenuScrollKey= overrides
+	 * without a rebuild; -LogInput lists every registered key.
+	 */
+	UPROPERTY(Config)
+	FString MenuScrollKey = TEXT("Vive_Left_Trackpad_Y,Vive_Right_Trackpad_Y,ValveIndex_Left_Thumbstick_Y,ValveIndex_Right_Thumbstick_Y");
+
+	/** The trackpad's (or thumbstick's) click, which runs the highlighted item of the actions list. -MenuSelectKey= overrides. */
+	UPROPERTY(Config)
+	FString MenuSelectKey = TEXT("Vive_Left_Trackpad_Click,Vive_Right_Trackpad_Click,ValveIndex_Left_Thumbstick_Click,ValveIndex_Right_Thumbstick_Click");
+
+	/**
+	 * The view-radius dial reads only the left controller's trackpad (the Index's left thumbstick): a
+	 * vertical axis, polled like the others and counted only while the pad is touched. The dial is on
+	 * the left controller that opens it, so the right pad is left for the actions list. -RadiusDialKey=
+	 * overrides without a rebuild.
+	 */
+	UPROPERTY(Config)
+	FString RadiusDialKey = TEXT("Vive_Left_Trackpad_Y,ValveIndex_Left_Thumbstick_Y");
+
 	/** The pointing hand's ray, drawn as dots. */
 	UPROPERTY()
 	TObjectPtr<UInstancedStaticMeshComponent> Dots;
@@ -302,6 +350,36 @@ private:
 
 	UPROPERTY()
 	TArray<TObjectPtr<UTextRenderComponent>> MenuItems;
+
+	/**
+	 * The view-radius block the left controller opens: a framed panel floating opposite the info
+	 * panel, with a horizontal slider (track and knob) showing how far out stars are shown, the
+	 * cutoff in words below it, and a hint. The left trackpad slides the knob; its click shows every
+	 * star or the last radius. The controller's answer to the Vision Pro hand-menu slider.
+	 */
+	UPROPERTY()
+	TObjectPtr<USceneComponent> RadiusPanel;
+
+	UPROPERTY()
+	TObjectPtr<UProceduralMeshComponent> RadiusFrame;
+
+	UPROPERTY()
+	TObjectPtr<UTextRenderComponent> RadiusTitle;
+
+	UPROPERTY()
+	TObjectPtr<UTextRenderComponent> RadiusValue;
+
+	UPROPERTY()
+	TObjectPtr<UTextRenderComponent> RadiusHint;
+
+	UPROPERTY()
+	TObjectPtr<UProceduralMeshComponent> RadiusTrack;
+
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> RadiusKnob;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> RadiusKnobMaterial;
 
 	/** The hand menu, beside the other hand: a framed button for each item. */
 	UPROPERTY()
@@ -401,10 +479,25 @@ private:
 	FQuat PanelRotation = FQuat::Identity;
 	/** Where the panel's centre is, in the head's frame (forward, right, up): moved by its bar. */
 	FVector PanelPlace = FVector(100.0, 22.0, -21.0);
+	/** The view-radius block's centre, in the head's frame: opposite the info panel, to its left. */
+	FVector RadiusPanelPlace = FVector(100.0, -22.0, -21.0);
 	/** The part of the panel the pointing ray meets this frame, or PartNone. */
 	int32 Aimed = 0;
 	double AimedAlong = 0.0;
 	bool bMenuOpen = false;
+	/** The highlighted item of the actions list while it is open and driven by the controller trackpad, or INDEX_NONE. */
+	int32 MenuCursor = INDEX_NONE;
+	/** The trackpad must return near its centre between scroll steps, so one flick steps once. */
+	bool bMenuScrollArmed = true;
+	/** The view-radius dial, opened by the left controller's menu button; the trackpad then sets the radius, its click turns it off and on. */
+	bool bRadiusOpen = false;
+	/** The radius the dial's click restores when it turns the radius back on, in parsecs; 0 until one is set. */
+	double RadiusBeforeOff = 0.0;
+	/** The radius block's rotation, which follows the head a little behind, and whether it has been placed yet. */
+	FQuat RadiusPanelRotation = FQuat::Identity;
+	bool bRadiusPlaced = false;
+	/** The left trackpad is being slid this frame: the knob and value light up while it is. */
+	bool bRadiusAdjusting = false;
 	/** Carrying the panel by its bar: how far along the ray it was grabbed, and from the panel's centre. */
 	bool bCarrying = false;
 	double CarryAlong = 0.0;

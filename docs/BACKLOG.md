@@ -19,7 +19,8 @@ Each entry says where the idea came from and which phase it most likely belongs 
   From PLH, 30 October 2026; see [notes/2026-10-30-DIRECTION.md](notes/2026-10-30-DIRECTION.md#f2-a-radius-of-visibility).
   Phase 2.
   Under way since 5 November 2026: centred on the viewer, with a soft edge, set by a slider on the Vision Pro's hand menu and in the desktop console, a two-handed stretch, and voice ("show within 20 light years", "show more", "show less", "show everything").
-  Still to do: the count of stars inside, other centres, the faintest magnitude alongside, and the Vive's trackpad.
+  Done on 8 November 2026 for the Vive: a view-radius block the left controller's menu button or grip opens, floating opposite the info panel, with a slider showing the cutoff and the distance in words; the left trackpad slides it (its reading squared for fine control, counted only while the pad is touched so it holds when let go) and the trackpad's click shows every star or the last radius. See [VIVE.md](../spikes/unreal-stars/VIVE.md).
+  Still to do: the count of stars inside, other centres, and the faintest magnitude alongside.
 
 - **Galactic orientation.** A galactic longitude and latitude grid, red, on and off, with the galactic equator, poles and centre marked; an axis triad showing the galactic axes, on the wrist of the hand that does not point (Vision Pro) or on that hand's controller (Vive).
   The same mechanism gives equatorial and ecliptic grids.
@@ -51,6 +52,7 @@ Each entry says where the idea came from and which phase it most likely belongs 
 - **A visible controller in the headset.** Most Vive apps show the controller held, or at least a wand, in the field of view; the spike shows only the ray, so the held hand is easy to lose track of. A simple shape — a wand or pointer rod at the controller's pose, not a lifelike model — would be enough, with the ray running from its tip.
   From PLH, 2 November 2026, from the Vive spike ([VIVE.md](../spikes/unreal-stars/VIVE.md)).
   Phase 3.
+  Done on 6 November 2026: a thin rod on each tracked controller, along its aim with the ray running from the tip, dimmer than the ray and colour-coded like a ship's navigation lights (the left hand red for port, the right green for starboard); its length and radius tunable with `-WandLength=` and `-WandRadius=`, and `-NoWand` to hide it.
 
 - **The controller's other inputs.** The Vive controller has a menu button, a circular trackpad with a click, and two grip buttons besides the trigger; the spike reads only the trigger. Map the rest to the named actions (the action registry the voice spike defines), so a controller reaches the same commands as the panel, the gestures and voice. Some are already spoken for elsewhere — the menu button for the settings screen (F1), the trackpad for the radius of visibility (F2) — leaving the grip buttons and the trackpad click for Keep, let-go, grids, "Return to the Sun" and the like.
   From PLH, 2 November 2026, from the Vive spike ([VIVE.md](../spikes/unreal-stars/VIVE.md)).
@@ -114,6 +116,14 @@ Each entry says where the idea came from and which phase it most likely belongs 
 - **Spoken forms of names.** Star names as people say them ("Delta Pavonis" for `del Pav`, "Alpha Centauri A"), added to the `identifier` table so voice (F9) and search can find them.
   From the direction discussion, 30 October 2026.
   Phase 4.
+
+## Rendering
+
+- **A darker sky on the Vive.** Looking back at the dense core from out near the edge is washed out on the Vive Pro 2, not the crisp field the Vision Pro shows: the LCD's weaker blacks, Unreal's bloom spreading the faint stars into a haze, and the sheer number of faint stars together.
+  Levers: turn bloom off or down and lift the black point with a camera post-process, and tune the star exposure, size and faintest magnitude for the panel (the `-StarExposure=`, `-StarSize=`, `-LimitingMag=` flags already allow this without a rebuild).
+  Bake the chosen values in as the Vive's defaults, with the post-process tunable by flag.
+  From PLH, 6 November 2026, in the Vive.
+  Phase 3.
 
 ## Known engine limits on Vision Pro
 

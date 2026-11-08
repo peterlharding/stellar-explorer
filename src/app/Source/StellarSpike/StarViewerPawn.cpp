@@ -2,13 +2,28 @@
 
 #include "Camera/CameraComponent.h"
 #include "Components/InputComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "GameFramework/FloatingPawnMovement.h"
 #include "GameFramework/PlayerController.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "MotionControllerComponent.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogStarViewerPawn, Log, All);
 
 namespace
 {
 	constexpr float ShiftSpeedFactor = 10.0f;
+	// Dimmer than the ray's dots, and colour-coded like a ship's navigation lights: the left (port)
+	// hand red, the right (starboard) green. (The dots glow at 0.4; the wands sit below them.)
+	constexpr float WandBrightness = 0.22f;
+	const FLinearColor LeftWandColour = FLinearColor(1.0f, 0.18f, 0.12f) * WandBrightness;
+	const FLinearColor RightWandColour = FLinearColor(0.18f, 1.0f, 0.3f) * WandBrightness;
+	// The basic cylinder is 100 units tall along its local Z and 100 across (radius 50).
+	constexpr float CylinderLength = 100.0f;
+	constexpr float CylinderRadius = 50.0f;
 }
 
 AStarViewerPawn::AStarViewerPawn()
@@ -31,6 +46,56 @@ AStarViewerPawn::AStarViewerPawn()
 	RightController = CreateDefaultSubobject<UMotionControllerComponent>(TEXT("RightController"));
 	RightController->SetupAttachment(RootComponent);
 	RightController->MotionSource = FName(TEXT("RightAim"));
+
+	// A rod on each controller, pointing along its aim; built in BeginPlay, where the mesh, the
+	// material and the command-line size are to hand. Hidden until a controller is seen tracked.
+	LeftWand = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftWand"));
+	LeftWand->SetupAttachment(LeftController);
+	RightWand = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightWand"));
+	RightWand->SetupAttachment(RightController);
+	for (UStaticMeshComponent* Wand : {LeftWand.Get(), RightWand.Get()})
+	{
+		Wand->SetCastShadow(false);
+		Wand->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Wand->SetVisibility(false);
+	}
+}
+
+void AStarViewerPawn::BeginPlay()
+{
+	Super::BeginPlay();
+	FParse::Value(FCommandLine::Get(), TEXT("WandLength="), WandLength);
+	FParse::Value(FCommandLine::Get(), TEXT("WandRadius="), WandRadius);
+	bShowWand = !FParse::Param(FCommandLine::Get(), TEXT("NoWand"));
+
+	UStaticMesh* Cylinder = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	if (UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/M_Pointer.M_Pointer")))
+	{
+		LeftWandMaterial = UMaterialInstanceDynamic::Create(Material, this);
+		LeftWandMaterial->SetVectorParameterValue(TEXT("Colour"), LeftWandColour);
+		RightWandMaterial = UMaterialInstanceDynamic::Create(Material, this);
+		RightWandMaterial->SetVectorParameterValue(TEXT("Colour"), RightWandColour);
+	}
+	const auto SetupWand = [&](UStaticMeshComponent* Wand, UMaterialInstanceDynamic* Material)
+	{
+		if (Cylinder != nullptr)
+		{
+			Wand->SetStaticMesh(Cylinder);
+		}
+		if (Material != nullptr)
+		{
+			Wand->SetMaterial(0, Material);
+		}
+		// Lay the cylinder's length (its local Z) along the controller's forward (+X), thin it to a
+		// rod, and slide it forward so it runs from the aim origin out to WandLength, the ray going
+		// on from its tip. Relative scale is in the component's own frame, before this rotation.
+		Wand->SetRelativeRotation(FRotationMatrix::MakeFromZ(FVector::ForwardVector).Rotator());
+		Wand->SetRelativeScale3D(FVector(WandRadius / CylinderRadius, WandRadius / CylinderRadius, WandLength / CylinderLength));
+		Wand->SetRelativeLocation(FVector(WandLength / 2.0f, 0.0f, 0.0f));
+	};
+	SetupWand(LeftWand, LeftWandMaterial);
+	SetupWand(RightWand, RightWandMaterial);
+	UE_LOG(LogStarViewerPawn, Display, TEXT("Wand: %s, %.1f cm long, %.1f cm across"), bShowWand ? TEXT("on") : TEXT("off (-NoWand)"), WandLength, 2.0f * WandRadius);
 }
 
 void AStarViewerPawn::UseHeadset()
@@ -58,6 +123,11 @@ void AStarViewerPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 void AStarViewerPawn::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	// Each wand shows while its controller is tracked: the Vive shows both, so either hand can be
+	// found; hand tracking and the desktop leave them untracked, so the wands stay hidden.
+	LeftWand->SetVisibility(bShowWand && LeftController->IsTracked());
+	RightWand->SetVisibility(bShowWand && RightController->IsTracked());
+
 	APlayerController* Player = Cast<APlayerController>(GetController());
 	if (bHeadset || Player == nullptr)
 	{
