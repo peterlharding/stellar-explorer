@@ -70,6 +70,12 @@ namespace
 	// steps once.
 	constexpr float MenuScrollStep = 0.5f;
 	constexpr float MenuScrollArm = 0.2f;
+	// The view-radius dial: the left trackpad's vertical axis moves the radius along its log scale by
+	// this fraction of the whole range per second at a full push, ignored within the deadzone. The
+	// axis is squared (keeping its sign) before it drives the dial, so a small thumb move barely
+	// creeps and only a firm push is quick: fine control near the ends without a crawl across the middle.
+	constexpr float RadiusDialRate = 0.22f;
+	constexpr float RadiusDialDeadzone = 0.15f;
 	// Angular radius of the rings around a star.
 	constexpr double RingDegrees = 0.7;
 	// The panel: its size, the text heights, and how long it takes to follow the head's
@@ -134,6 +140,17 @@ namespace
 	{
 		return MenuTop - MenuPadding - (Item + 0.5) * ItemHeight;
 	}
+	// The view-radius block the left controller opens: a frame with a title, a horizontal slider
+	// (track and knob) for how far out stars are shown, the cutoff in words, and a hint.
+	constexpr double RadiusPanelWidth = 28.0;
+	constexpr double RadiusPanelHeight = 13.0;
+	constexpr double RadiusTrackWidth = RadiusPanelWidth - 2.0 * PanelPadding;
+	constexpr double RadiusTrackThickness = 0.3;
+	constexpr double RadiusTrackUp = 1.6;
+	constexpr double RadiusKnobDiameter = 1.3;
+	constexpr double RadiusTitleUp = RadiusPanelHeight / 2.0 - PanelPadding;
+	constexpr double RadiusValueUp = -1.8;
+	constexpr double RadiusHintUp = -RadiusPanelHeight / 2.0 + PanelPadding;
 	constexpr double LightYearsPerParsec = 3.26156;
 	/** The size of a dot hidden beyond the panel: too small to see, never zero. */
 	constexpr double HiddenDot = 1e-3;
@@ -486,6 +503,43 @@ AStarPointer::AStarPointer()
 		MenuItems.Add(Text);
 	}
 
+	// The view-radius block: a frame with a title, a horizontal slider, the cutoff in words, and a
+	// hint. It floats opposite the info panel while the left controller's dial is open (PlaceRadiusPanel).
+	RadiusPanel = CreateDefaultSubobject<USceneComponent>(TEXT("RadiusPanel"));
+	RadiusPanel->SetupAttachment(RootComponent);
+	RadiusPanel->SetVisibility(false, true);
+	RadiusFrame = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("RadiusFrame"));
+	RadiusFrame->SetupAttachment(RadiusPanel);
+	RadiusTitle = CreateDefaultSubobject<UTextRenderComponent>(TEXT("RadiusTitle"));
+	RadiusTitle->SetupAttachment(RadiusPanel);
+	RadiusTitle->SetRelativeLocation(OnPanel(-RadiusPanelWidth / 2.0 + PanelPadding, RadiusTitleUp));
+	RadiusTitle->SetWorldSize(TitleSize);
+	RadiusTitle->SetText(FText::FromString(TEXT("View radius")));
+	RadiusTitle->SetHorizontalAlignment(EHTA_Left);
+	RadiusTitle->SetVerticalAlignment(EVRTA_TextTop);
+	RadiusValue = CreateDefaultSubobject<UTextRenderComponent>(TEXT("RadiusValue"));
+	RadiusValue->SetupAttachment(RadiusPanel);
+	RadiusValue->SetRelativeLocation(OnPanel(0.0, RadiusValueUp));
+	RadiusValue->SetWorldSize(DetailsSize);
+	RadiusValue->SetHorizontalAlignment(EHTA_Center);
+	RadiusValue->SetVerticalAlignment(EVRTA_TextCenter);
+	RadiusHint = CreateDefaultSubobject<UTextRenderComponent>(TEXT("RadiusHint"));
+	RadiusHint->SetupAttachment(RadiusPanel);
+	RadiusHint->SetRelativeLocation(OnPanel(-RadiusPanelWidth / 2.0 + PanelPadding, RadiusHintUp));
+	RadiusHint->SetWorldSize(HintSize);
+	RadiusHint->SetText(FText::FromString(TEXT("Left trackpad: set  ·  click: every star")));
+	RadiusHint->SetHorizontalAlignment(EHTA_Left);
+	RadiusHint->SetVerticalAlignment(EVRTA_TextBottom);
+	RadiusTrack = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("RadiusTrack"));
+	RadiusTrack->SetupAttachment(RadiusPanel);
+	RadiusTrack->SetRelativeLocation(OnPanel(0.0, RadiusTrackUp));
+	RadiusKnob = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RadiusKnob"));
+	RadiusKnob->SetupAttachment(RadiusPanel);
+	RadiusKnob->SetCastShadow(false);
+	RadiusKnob->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	// The basic sphere is 100 units across; flattened onto the panel's plane, as the hand slider's knob.
+	RadiusKnob->SetRelativeScale3D(FVector(0.1, 1.0, 1.0) * RadiusKnobDiameter / 100.0);
+
 	HandMenu = CreateDefaultSubobject<USceneComponent>(TEXT("HandMenu"));
 	HandMenu->SetupAttachment(RootComponent);
 	WristButton = CreateDefaultSubobject<USceneComponent>(TEXT("WristButton"));
@@ -575,6 +629,10 @@ void AStarPointer::BeginPlay()
 	ActionsFrame->SetMaterial(0, ColouredMaterial(FrameColour));
 	BuildFrame(MenuFrame, MenuWidth, MenuHeight, FrameThickness);
 	MenuFrame->SetMaterial(0, ColouredMaterial(FrameColour));
+	BuildFrame(RadiusFrame, RadiusPanelWidth, RadiusPanelHeight, FrameThickness);
+	RadiusFrame->SetMaterial(0, ColouredMaterial(FrameColour));
+	BuildQuad(RadiusTrack, RadiusTrackWidth, RadiusTrackThickness);
+	RadiusTrack->SetMaterial(0, ColouredMaterial(BarColour));
 	// Thinner than the panel's frame, as the menu is nearer: about as thick to the eye.
 	for (UProceduralMeshComponent* Button : HandFrames)
 	{
@@ -610,7 +668,12 @@ void AStarPointer::BeginPlay()
 		}
 		WristText->SetTextMaterial(Text);
 		HandSliderLabel->SetTextMaterial(Text);
+		RadiusTitle->SetTextMaterial(Text);
+		RadiusValue->SetTextMaterial(Text);
+		RadiusHint->SetTextMaterial(Text);
 	}
+	RadiusTitle->SetTextRenderColor((DetailsColour * OverlayBrightness).ToFColor(false));
+	RadiusHint->SetTextRenderColor((HintColour * OverlayBrightness).ToFColor(false));
 	UStaticMesh* Sphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	Dots->SetStaticMesh(Sphere);
 	Dots->SetMaterial(0, ColouredMaterial(DotColour));
@@ -620,6 +683,9 @@ void AStarPointer::BeginPlay()
 	HandSliderKnob->SetStaticMesh(Sphere);
 	HandSliderKnobMaterial = ColouredMaterial(DetailsColour);
 	HandSliderKnob->SetMaterial(0, HandSliderKnobMaterial);
+	RadiusKnob->SetStaticMesh(Sphere);
+	RadiusKnobMaterial = ColouredMaterial(DetailsColour);
+	RadiusKnob->SetMaterial(0, RadiusKnobMaterial);
 	for (int32 Dot = 0; Dot < DotCount; ++Dot)
 	{
 		Dots->AddInstance(FTransform::Identity, true);
@@ -640,6 +706,8 @@ void AStarPointer::BeginPlay()
 	FParse::Value(FCommandLine::Get(), TEXT("MenuButtonKey="), MenuButtonKey);
 	FParse::Value(FCommandLine::Get(), TEXT("MenuScrollKey="), MenuScrollKey);
 	FParse::Value(FCommandLine::Get(), TEXT("MenuSelectKey="), MenuSelectKey);
+	FParse::Value(FCommandLine::Get(), TEXT("RadiusButtonKey="), RadiusButtonKey);
+	FParse::Value(FCommandLine::Get(), TEXT("RadiusDialKey="), RadiusDialKey);
 	bLogInput = FParse::Param(FCommandLine::Get(), TEXT("LogInput"));
 	bShowControls = FParse::Param(FCommandLine::Get(), TEXT("PanelControls"));
 	bHandRay |= FParse::Param(FCommandLine::Get(), TEXT("HandRay"));
@@ -929,19 +997,37 @@ void AStarPointer::Tick(float DeltaSeconds)
 	// pointing at the panel. Polled like the trigger (GetRays has just set bUsingControllers);
 	// the keys are device-specific, so each candidate is tried. Edge-triggered: one press, one
 	// toggle. The visibility update clears bMenuOpen if the controllers drop out (bMenuOpen &= bButton).
+	// Lit only on a frame the dial moves; the radius block reads it to light its knob and value.
+	bRadiusAdjusting = false;
 	if (bHeadset && bUsingControllers)
 	{
-		TArray<FString> MenuKeys;
-		MenuButtonKey.ParseIntoArray(MenuKeys, TEXT(","));
-		for (const FString& KeyName : MenuKeys)
+		const auto ButtonPressed = [&](const FString& Keys)
 		{
-			if (Player->WasInputKeyJustPressed(FKey(*KeyName.TrimStartAndEnd())))
+			TArray<FString> Names;
+			Keys.ParseIntoArray(Names, TEXT(","));
+			for (const FString& KeyName : Names)
 			{
-				bMenuOpen = !bMenuOpen;
-				UE_LOG(LogStarPointer, Display, TEXT("Menu button [%s]: actions list %s"),
-					*KeyName.TrimStartAndEnd(), bMenuOpen ? TEXT("open") : TEXT("closed"));
-				break;
+				if (Player->WasInputKeyJustPressed(FKey(*KeyName.TrimStartAndEnd())))
+				{
+					return true;
+				}
 			}
+			return false;
+		};
+		// The right controller's menu button toggles the actions list; the left's menu button or grip
+		// toggles the view-radius dial. Only one is open at a time.
+		if (ButtonPressed(MenuButtonKey))
+		{
+			bMenuOpen = !bMenuOpen;
+			bRadiusOpen = false;
+			UE_LOG(LogStarPointer, Display, TEXT("Right menu button: actions list %s"), bMenuOpen ? TEXT("open") : TEXT("closed"));
+		}
+		if (ButtonPressed(RadiusButtonKey))
+		{
+			bRadiusOpen = !bRadiusOpen;
+			bMenuOpen = false;
+			// The radius block shows the cutoff and the slider while it is open (PlaceRadiusPanel); no note.
+			UE_LOG(LogStarPointer, Display, TEXT("Left radius button: radius dial %s"), bRadiusOpen ? TEXT("open") : TEXT("closed"));
 		}
 	}
 	// With the actions list open, the controller's trackpad (the Index's thumbstick) scrolls a
@@ -949,25 +1035,54 @@ void AStarPointer::Tick(float DeltaSeconds)
 	// small to aim the ray at. Polled like the trigger; the axis and click keys are device-specific,
 	// so each candidate is tried, the largest magnitude winning. The scroll is edge-triggered with a
 	// re-arm (MenuScrollStep / MenuScrollArm), so one flick steps once.
+	// The scroll axis (trackpad or thumbstick Y), counted only from a pad that is being touched. An
+	// untouched Vive trackpad keeps reporting its last position, which would step the list or run the
+	// dial on its own, and polling both hands lets the idle pad override the one in use; the touch gate
+	// (each axis's "_Y" swapped for "_Touch") ignores a pad no thumb is on. A thumbstick springs back,
+	// but pushing it touches it too, so the gate suits both. Keys without a known touch pair are not
+	// gated, so an exotic -MenuScrollKey= override still reads.
+	const auto ReadScrollAxis = [&](const FString& Keys) -> float
+	{
+		TArray<FString> ScrollKeys;
+		Keys.ParseIntoArray(ScrollKeys, TEXT(","));
+		float Value = 0.0f;
+		for (const FString& Raw : ScrollKeys)
+		{
+			const FString KeyName = Raw.TrimStartAndEnd();
+			if (KeyName.EndsWith(TEXT("_Y")))
+			{
+				const FKey Touch(*(KeyName.LeftChop(2) + TEXT("_Touch")));
+				if (Touch.IsValid() && !Player->IsInputKeyDown(Touch))
+				{
+					continue;
+				}
+			}
+			const float Axis = Player->GetInputAnalogKeyState(FKey(*KeyName));
+			if (FMath::Abs(Axis) > FMath::Abs(Value))
+			{
+				Value = Axis;
+			}
+		}
+		return Value;
+	};
 	if (bHeadset && bUsingControllers && bMenuOpen)
 	{
-		if (MenuCursor == INDEX_NONE)
+		// The ray picks an item too: while it last pointed at one, the highlight follows the ray, so
+		// the trackpad's click runs what the ray is on (as the trigger does, through PressPanel). Aimed
+		// holds the previous frame's part, set below in the ray loop; aimed away from the list it keeps
+		// its value, so the trackpad still scrolls the highlight when the ray is off to the side.
+		if (Aimed >= PartItem && Aimed < PartItem + MenuCount)
+		{
+			MenuCursor = Aimed - PartItem;
+			bMenuScrollArmed = true;
+		}
+		else if (MenuCursor == INDEX_NONE)
 		{
 			// Start on the first item; make the pad return to centre before the first step.
 			MenuCursor = 0;
 			bMenuScrollArmed = false;
 		}
-		TArray<FString> ScrollKeys;
-		MenuScrollKey.ParseIntoArray(ScrollKeys, TEXT(","));
-		float Scroll = 0.0f;
-		for (const FString& KeyName : ScrollKeys)
-		{
-			const float Value = Player->GetInputAnalogKeyState(FKey(*KeyName.TrimStartAndEnd()));
-			if (FMath::Abs(Value) > FMath::Abs(Scroll))
-			{
-				Scroll = Value;
-			}
-		}
+		const float Scroll = ReadScrollAxis(MenuScrollKey);
 		if (bMenuScrollArmed && FMath::Abs(Scroll) >= MenuScrollStep)
 		{
 			// Up the pad (positive) moves towards the first item, which sits at the top of the list.
@@ -992,6 +1107,49 @@ void AStarPointer::Tick(float DeltaSeconds)
 				RunMenuItem(Chosen);
 				break;
 			}
+		}
+	}
+	else if (bHeadset && bUsingControllers && bRadiusOpen)
+	{
+		MenuCursor = INDEX_NONE;
+		// The left trackpad's vertical axis dials the radius along its log scale: up (positive) further
+		// out, down nearer in, the top of the range every star shown. The right pad is left to the
+		// actions list, so only RadiusDialKey (left) is read, and only while the pad is touched, so it
+		// holds still when let go. The axis is squared (sign kept) for fine control near the ends. The
+		// radius block shows the value live (PlaceRadiusPanel), so this sets it directly without a note.
+		const float Scroll = ReadScrollAxis(RadiusDialKey);
+		if (StarField != nullptr && FMath::Abs(Scroll) > RadiusDialDeadzone)
+		{
+			const double Base = AStarField::ViewFraction(StarField->GetViewRadius());
+			const double Fraction = FMath::Clamp(Base + RadiusDialRate * Scroll * FMath::Abs(Scroll) * DeltaSeconds, 0.0, 1.0);
+			StarField->SetViewRadius(AStarField::ViewRadiusAt(Fraction));
+			bRadiusAdjusting = true;
+		}
+		// The left pad's click turns the radius off (every star shown) and on again (the last radius
+		// set). Only the left click, as with the axis: the right pad's click is the actions list's.
+		// The block shows the new value, so the radius is set directly, without a note.
+		TArray<FString> SelectKeys;
+		MenuSelectKey.ParseIntoArray(SelectKeys, TEXT(","));
+		for (const FString& KeyName : SelectKeys)
+		{
+			const FString Trimmed = KeyName.TrimStartAndEnd();
+			if (!Trimmed.Contains(TEXT("Left")) || !Player->WasInputKeyJustPressed(FKey(*Trimmed)))
+			{
+				continue;
+			}
+			if (StarField != nullptr && StarField->GetViewRadius() > 0.0)
+			{
+				RadiusBeforeOff = StarField->GetViewRadius();
+				StarField->SetViewRadius(0.0);
+			}
+			else if (StarField != nullptr)
+			{
+				StarField->SetViewRadius(RadiusBeforeOff > 0.0 ? RadiusBeforeOff : AStarField::ViewRadiusAt(0.5));
+			}
+			bRadiusAdjusting = true;
+			UE_LOG(LogStarPointer, Display, TEXT("Radius dial click: %s"),
+				*AStarField::DescribeViewRadius(StarField != nullptr ? StarField->GetViewRadius() : 0.0));
+			break;
 		}
 	}
 	else
@@ -1165,6 +1323,7 @@ void AStarPointer::Tick(float DeltaSeconds)
 	PlaceRing(HoverRing, Hovered != Selected && !bMovingView ? Hovered : INDEX_NONE, Head);
 	PlaceRing(SelectionRing, Selected, Head);
 	PlacePanel(Head, HeadRotation, DeltaSeconds);
+	PlaceRadiusPanel(Head, HeadRotation, DeltaSeconds);
 	if (NoteUntil > 0.0 && Now > NoteUntil)
 	{
 		SetVoiceLine(FString(), false);
@@ -2027,6 +2186,8 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 	const bool bButton = (bHeadset && bUsingControllers) || bShowControls;
 	const bool bList = (bButton && bMenuOpen) || bShowControls;
 	bMenuOpen &= bButton;
+	// The radius dial lives on the same controllers; drop it with them.
+	bRadiusOpen &= bButton;
 	GrabBar->SetVisibility((bHeadset || bShowControls) && bInfoVisible);
 	HideRing->SetVisibility(GrabBar->IsVisible());
 	HideCross->SetVisibility(GrabBar->IsVisible());
@@ -2094,6 +2255,37 @@ void AStarPointer::PlacePanel(const FVector& Head, const FRotator& HeadRotation,
 	Title->SetTextRenderColor((HintColour * OverlayBrightness).ToFColor(false));
 	// With nothing to describe, the build, so a session can be matched to its code.
 	Details->SetText(FText::FromString(FString::Printf(TEXT("v%s, build %s\n%s"), *StellarVersion(), *StellarShortCommit(), *StellarShortBranchAndTime())));
+}
+
+void AStarPointer::PlaceRadiusPanel(const FVector& Head, const FRotator& HeadRotation, float DeltaSeconds)
+{
+	// Shown while the dial is open, on controllers. PlacePanel has already cleared bRadiusOpen if the
+	// controllers dropped out, so this only has to follow it.
+	const bool bShow = bRadiusOpen && bHeadset && bUsingControllers;
+	RadiusPanel->SetVisibility(bShow, true);
+	if (!bShow)
+	{
+		bRadiusPlaced = false;
+		return;
+	}
+	// Follow the head a little behind, like the info panel, square on to the view.
+	const FQuat Target = HeadRotation.Quaternion();
+	RadiusPanelRotation = bRadiusPlaced ? FQuat::Slerp(RadiusPanelRotation, Target, 1.0 - FMath::Exp(-DeltaSeconds / PanelFollowSeconds)) : Target;
+	bRadiusPlaced = true;
+	const FVector Place = Head + RadiusPanelRotation.RotateVector(RadiusPanelPlace);
+	RadiusPanel->SetWorldLocationAndRotation(Place, FRotationMatrix::MakeFromXZ(Head - Place, RadiusPanelRotation.GetUpVector()).ToQuat());
+
+	// The knob sits where the radius is along the track; the value reads the cutoff in words. Both
+	// light up on a frame the dial is being moved.
+	const double Radius = StarField != nullptr ? StarField->GetViewRadius() : 0.0;
+	const double Fraction = AStarField::ViewFraction(Radius);
+	RadiusKnob->SetRelativeLocation(OnPanel(-RadiusTrackWidth / 2.0 + Fraction * RadiusTrackWidth, RadiusTrackUp) + FVector(0.05, 0.0, 0.0));
+	RadiusValue->SetText(FText::FromString(AStarField::DescribeViewRadius(Radius)));
+	RadiusValue->SetTextRenderColor(((bRadiusAdjusting ? SelectionColour : DetailsColour) * OverlayBrightness).ToFColor(false));
+	if (RadiusKnobMaterial != nullptr)
+	{
+		RadiusKnobMaterial->SetVectorParameterValue(TEXT("Colour"), (bRadiusAdjusting ? SelectionColour : DetailsColour) * OverlayBrightness);
+	}
 }
 
 void AStarPointer::ShowStar(int32 Star, const FLinearColor& Colour)
