@@ -8,7 +8,7 @@
 
 The only real uncertainty is **visionOS**. So the go/no-go is:
 
-> Can a Rust static library with a C ABI be linked into the Unreal project and **cooked and run on all three targets — Windows x64, macOS arm64, and visionOS (device *and* simulator)**?
+> Can a Rust static library with a C ABI be linked into the Unreal project and **cooked and run on all three targets - Windows x64, macOS arm64, and visionOS (device *and* simulator)**?
 
 Windows and macOS arm64 are well-supported Rust targets; **visionOS is Tier 3** (no prebuilt `std`, built from source with a nightly toolchain and `-Z build-std`). If visionOS clears, Rust-for-the-core is genuinely on the table and would be settled by a new ADR revisiting [0008](../../docs/decisions/0008-core-in-cpp.md). If it fights, the C++ core stands and little is lost.
 
@@ -16,10 +16,10 @@ This is a feasibility probe, not the real core: the library here exists only to 
 
 ## What's here
 
-- `Cargo.toml` — a `staticlib` crate, `panic = "abort"` (panics must not unwind across the FFI boundary).
-- `src/lib.rs` — two `extern "C"` functions: an ABI version, and parallax→distance (the phase-1 reference maths, as a non-trivial smoke test).
-- `include/stellar_core.h` — the C header the Unreal side includes.
-- `build.sh` — per-target `cargo` invocations, including the visionOS nightly/`build-std` form.
+- `Cargo.toml` - a `staticlib` crate, `panic = "abort"` (panics must not unwind across the FFI boundary).
+- `src/lib.rs` - two `extern "C"` functions: an ABI version, and parallax→distance (the phase-1 reference maths, as a non-trivial smoke test).
+- `include/stellar_core.h` - the C header the Unreal side includes.
+- `build.sh` - per-target `cargo` invocations, including the visionOS nightly/`build-std` form.
 
 ## Method
 
@@ -27,7 +27,7 @@ This is a feasibility probe, not the real core: the library here exists only to 
    - visionOS needs a nightly toolchain and the std source: `rustup toolchain install nightly` and `rustup component add rust-src --toolchain nightly`.
 2. **Wire it into Unreal** as a ThirdParty module (sketch below), pointing `PublicAdditionalLibraries` at the per-platform artefact and `PublicIncludePaths` at `include/`. Use the existing [unreal-stars](../unreal-stars/README.md) project, or a throwaway one.
 3. **Call it** from a game module: `stc_distance_parsecs(100.0)` must return `10.0` (100 mas → 10 pc); log it at start-up.
-4. **Cook and package** for each target and run — the **visionOS cook is the real test**, on both device and simulator, mirroring the steps in [VISIONOS.md](../unreal-stars/VISIONOS.md).
+4. **Cook and package** for each target and run - the **visionOS cook is the real test**, on both device and simulator, mirroring the steps in [VISIONOS.md](../unreal-stars/VISIONOS.md).
 
 ## Success criteria
 

@@ -49,12 +49,12 @@ Each entry says where the idea came from and which phase it most likely belongs 
   From the Unreal spike, 30 October 2026.
   Phase 3.
 
-- **A visible controller in the headset.** Most Vive apps show the controller held, or at least a wand, in the field of view; the spike shows only the ray, so the held hand is easy to lose track of. A simple shape — a wand or pointer rod at the controller's pose, not a lifelike model — would be enough, with the ray running from its tip.
+- **A visible controller in the headset.** Most Vive apps show the controller held, or at least a wand, in the field of view; the spike shows only the ray, so the held hand is easy to lose track of. A simple shape - a wand or pointer rod at the controller's pose, not a lifelike model - would be enough, with the ray running from its tip.
   From PLH, 2 November 2026, from the Vive spike ([VIVE.md](../spikes/unreal-stars/VIVE.md)).
   Phase 3.
   Done on 6 November 2026: a thin rod on each tracked controller, along its aim with the ray running from the tip, dimmer than the ray and colour-coded like a ship's navigation lights (the left hand red for port, the right green for starboard); its length and radius tunable with `-WandLength=` and `-WandRadius=`, and `-NoWand` to hide it.
 
-- **The controller's other inputs.** The Vive controller has a menu button, a circular trackpad with a click, and two grip buttons besides the trigger; the spike reads only the trigger. Map the rest to the named actions (the action registry the voice spike defines), so a controller reaches the same commands as the panel, the gestures and voice. Some are already spoken for elsewhere — the menu button for the settings screen (F1), the trackpad for the radius of visibility (F2) — leaving the grip buttons and the trackpad click for Keep, let-go, grids, "Return to the Sun" and the like.
+- **The controller's other inputs.** The Vive controller has a menu button, a circular trackpad with a click, and two grip buttons besides the trigger; the spike reads only the trigger. Map the rest to the named actions (the action registry the voice spike defines), so a controller reaches the same commands as the panel, the gestures and voice. Some are already spoken for elsewhere - the menu button for the settings screen (F1), the trackpad for the radius of visibility (F2) - leaving the grip buttons and the trackpad click for Keep, let-go, grids, "Return to the Sun" and the like.
   From PLH, 2 November 2026, from the Vive spike ([VIVE.md](../spikes/unreal-stars/VIVE.md)).
   Phase 3.
 

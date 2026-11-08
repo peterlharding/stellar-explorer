@@ -1,6 +1,6 @@
 # Unreal spike: the catalogue in Unreal Engine 5.8
 
-> **Graduated.** Unreal was chosen ([ADR 0012](../../docs/decisions/0012-unreal-front-end.md)) and the project moved to [`src/app/`](../../src/app/README.md); run it from there now. This directory is kept as the record of the spike's bring-up — the README below, with [VISIONOS.md](VISIONOS.md), [VIVE.md](VIVE.md) and [VOICE.md](VOICE.md).
+> **Graduated.** Unreal was chosen ([ADR 0012](../../docs/decisions/0012-unreal-front-end.md)) and the project moved to [`src/app/`](../../src/app/README.md); run it from there now. This directory is kept as the record of the spike's bring-up - the README below, with [VISIONOS.md](VISIONOS.md), [VIVE.md](VIVE.md) and [VOICE.md](VOICE.md).
 
 A throwaway project that answered one question before ADR 0007 (Godot) was reconsidered: can Unreal Engine render the Stellar Explorer catalogue well, on the desktop, the HTC Vive Pro 2 and the Apple Vision Pro?
 It was not the app itself; once Unreal was chosen the project graduated to `src/app/` (see the note above).
@@ -73,20 +73,20 @@ Reaching the headset took six fixes (see [VIVE.md](VIVE.md), with their evidence
 
 **Under way (2 November 2026):** working on the Mac and the Vision Pro with Apple's recogniser, by wake word in the headset; star names are the weak spot, and "go there" (to the star pointed at) the answer so far. The log, with its evidence, is [VOICE.md](VOICE.md).
 
-Can the app be driven by speech — a handful of verbs and a few dozen star names, including awkward ones like "Delta Pavonis" — accurately and fast enough to be worth building, on both headsets, ideally with one offline recogniser? It runs after the Vive test so it can be tried on both. See the [direction notes](../../docs/notes/2026-10-30-DIRECTION.md) (F9).
+Can the app be driven by speech - a handful of verbs and a few dozen star names, including awkward ones like "Delta Pavonis" - accurately and fast enough to be worth building, on both headsets, ideally with one offline recogniser? It runs after the Vive test so it can be tried on both. See the [direction notes](../../docs/notes/2026-10-30-DIRECTION.md) (F9).
 
 Scope: fixed commands mapped to the actions that already exist; star and cluster name recognition. Out of scope: natural-language questions turned into SQL (that is the queryable catalogue, [ADR 0004](../../docs/decisions/0004-extensible-queryable-catalogue.md), phase 4); the spike only shows it is not precluded.
 
-The lasting output is not the voice code but an **action registry**: each action — Keep, Go there, Examine, Return to the Sun, Take a picture, a grid on or off — is one named command, called alike by the panel, the gestures and the voice, so voice adds a new way in, not new behaviour.
+The lasting output is not the voice code but an **action registry**: each action - Keep, Go there, Examine, Return to the Sun, Take a picture, a grid on or off - is one named command, called alike by the panel, the gestures and the voice, so voice adds a new way in, not new behaviour.
 
 What it settles, with evidence, as the Vive test settles ADR 0012:
 
-- **Two recognition routes compared** on both headsets: each platform's own recogniser (Apple's `Speech` framework on the Vision Pro, Windows speech recognition on the PC) against one on-device model (Whisper through an Unreal plugin), for accuracy on star names, delay from speech to action, and — verified first, because it can sink the single-model plan — whether the plugin builds for visionOS at all. Both are tested with and without biasing toward the known vocabulary.
+- **Two recognition routes compared** on both headsets: each platform's own recogniser (Apple's `Speech` framework on the Vision Pro, Windows speech recognition on the PC) against one on-device model (Whisper through an Unreal plugin), for accuracy on star names, delay from speech to action, and - verified first, because it can sink the single-model plan - whether the plugin builds for visionOS at all. Both are tested with and without biasing toward the known vocabulary.
 - **The names.** The catalogue stores names as catalogues write them (`del Pav`, not "Delta Pavonis"; Alpha Centauri only as Rigil Kentaurus and Toliman), so the pipeline adds spoken forms to the `identifier` table and the recogniser matches against those. A fixed corpus of ~8 verbs and ~30 names, easy and hard, plus "the Pleiades" (needs the cluster catalogue from F6), is the scoring set.
 - **Starting to listen:** a wake word against a gesture that opens the microphone, tried in the headset; never always-listening. The panel echoes what it heard before acting.
 - **Permissions:** microphone and speech-recognition usage descriptions in the Vision Pro's `Info.plist`, as for hand tracking; the microphone permission Windows needs.
 
-The point of it (PLH): speech makes the app more accessible — to anyone for whom pinches or controllers are awkward, and to anyone who knows a star's name but not where it is.
+The point of it (PLH): speech makes the app more accessible - to anyone for whom pinches or controllers are awkward, and to anyone who knows a star's name but not where it is.
 
 ## Still to judge
 

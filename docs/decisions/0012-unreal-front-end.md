@@ -10,7 +10,7 @@ Supersedes [0007](0007-stack-core-sqlite-godot.md).
 [0007](0007-stack-core-sqlite-godot.md) chose a Godot 4 front end on the engine-independent C++ core ([0008](0008-core-in-cpp.md)) and the SQLite catalogue ([0004](0004-extensible-queryable-catalogue.md)).
 Its one real risk was that Godot's fully immersive Vision Pro support was new in 2026, so phase 3 of the [roadmap](../PLAN.md#roadmap) was set as a go or no-go on it.
 
-Rather than carry that risk to phase 3, an [Unreal spike](../../spikes/unreal-stars/README.md) built the real thing — the whole catalogue rendered, with a pointer and a provenance panel — in Unreal Engine 5.8.4, C++ only, across all three targets.
+Rather than carry that risk to phase 3, an [Unreal spike](../../spikes/unreal-stars/README.md) built the real thing - the whole catalogue rendered, with a pointer and a provenance panel - in Unreal Engine 5.8.4, C++ only, across all three targets.
 It reached full immersion on the Vision Pro (28–30 October 2026, logged with its evidence in [VISIONOS.md](../../spikes/unreal-stars/VISIONOS.md)) and then ran on the HTC Vive Pro 2, controllers pointing and selecting (30 October–2 November 2026, in [VIVE.md](../../spikes/unreal-stars/VIVE.md)).
 Unreal was agreed as the engine on 30 October; this record waited for the Vive test so it could cite that evidence too.
 

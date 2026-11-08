@@ -1,6 +1,6 @@
 //! Feasibility spike: a minimal Rust static library with a C ABI, to prove a Rust
 //! core can link into the Unreal project and cook on all three targets (Windows x64,
-//! macOS arm64, visionOS) — the visionOS build being the real test. See README.md.
+//! macOS arm64, visionOS) - the visionOS build being the real test. See README.md.
 //!
 //! This is not the real core; it exists only to be linked and called across the
 //! boundary that ADR 0014 defines.
@@ -11,7 +11,7 @@ pub extern "C" fn stc_abi_version() -> u32 {
     1
 }
 
-/// Distance in parsecs from a parallax in milliarcseconds — the phase-1 reference
+/// Distance in parsecs from a parallax in milliarcseconds - the phase-1 reference
 /// maths, used here as a non-trivial smoke test. Returns NaN for a non-positive
 /// parallax rather than panicking across the FFI boundary.
 #[no_mangle]
