@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- On the Vision Pro the app is named "Stellar Explorer" under its icon, rather than "StellarExplorer". Since the rename its bundle id is `io.github.peterlharding.StellarExplorer`, so it installs beside the old StellarSpike app rather than over it: delete that one from the headset.
+
 ## [0.5.0] - 2026-11-08
 
 See [release_notes/v0.5.0.md](release_notes/v0.5.0.md) for details.
