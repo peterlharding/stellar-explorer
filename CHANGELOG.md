@@ -6,6 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- The Vive's controllers now work on an HTC Vive Focus 3 streamed to a Windows PC through VIVE Streaming. The Focus 3's controllers reach SteamVR as Vive Cosmos and are bound through the Oculus Touch profile, so the app reads the OculusTouch_* keys alongside the Vive wand and Valve Index ones: the trigger points and keeps a star, the right controller's A or B button opens the actions menu, the left controller's X or Y button opens the view-radius dial, and the left thumbstick sets the radius.
+
+### Fixed
+
+- The view-radius dial and the menu scroll no longer gate a thumbstick behind a touch signal, so they work on controllers whose thumbstick touch is not reported (an HTC Vive Focus 3 streamed as a Vive Cosmos, bound through Oculus Touch, is one). Only a Vive trackpad, which reports a stale position when untouched, still needs the touch gate; a thumbstick springs back to centre on its own.
+
 ## [0.5.1] - 2026-11-08
 
 See [release_notes/v0.5.1.md](release_notes/v0.5.1.md) for details.
