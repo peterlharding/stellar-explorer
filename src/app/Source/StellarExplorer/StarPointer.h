@@ -237,14 +237,17 @@ private:
 	/**
 	 * The keys a controller's trigger appears as, when the headset has controllers (the Vive). The
 	 * keys are device-specific, so each is a comma-separated list tried in turn, the largest value
-	 * winning: a Vive wand and a Valve Index controller use different names. -RightTriggerKey= /
-	 * -LeftTriggerKey= override without a rebuild; -LogInput lists every key the engine registered.
+	 * winning: a Vive wand, a Valve Index controller and a Vive Focus 3 controller use different
+	 * names. The Focus 3 reaches a Windows PC by VIVE Streaming, which presents its controllers to
+	 * SteamVR as Vive Cosmos and binds them through the Oculus Touch profile, so the Focus 3's inputs
+	 * arrive as OculusTouch_* keys. -RightTriggerKey= / -LeftTriggerKey= override without a rebuild;
+	 * -LogInput lists every key the engine registered.
 	 */
 	UPROPERTY(Config)
-	FString RightTriggerKey = TEXT("Vive_Right_Trigger_Axis,ValveIndex_Right_Trigger_Axis");
+	FString RightTriggerKey = TEXT("Vive_Right_Trigger_Axis,ValveIndex_Right_Trigger_Axis,OculusTouch_Right_Trigger_Axis");
 
 	UPROPERTY(Config)
-	FString LeftTriggerKey = TEXT("Vive_Left_Trigger_Axis,ValveIndex_Left_Trigger_Axis");
+	FString LeftTriggerKey = TEXT("Vive_Left_Trigger_Axis,ValveIndex_Left_Trigger_Axis,OculusTouch_Left_Trigger_Axis");
 
 	/**
 	 * The keys the right controller's menu button appears as, device-specific like the trigger keys:
@@ -254,7 +257,7 @@ private:
 	 * -MenuButtonKey= overrides without a rebuild; -LogInput lists every registered key.
 	 */
 	UPROPERTY(Config)
-	FString MenuButtonKey = TEXT("Vive_Right_Menu_Click,ValveIndex_Right_B_Click");
+	FString MenuButtonKey = TEXT("Vive_Right_Menu_Click,ValveIndex_Right_B_Click,OculusTouch_Right_A_Click,OculusTouch_Right_B_Click");
 
 	/**
 	 * The keys that open the view-radius dial on the left controller, where the trackpad's vertical
@@ -264,7 +267,7 @@ private:
 	 * and device-specific like the others; -RadiusButtonKey= overrides, -LogInput lists registered keys.
 	 */
 	UPROPERTY(Config)
-	FString RadiusButtonKey = TEXT("Vive_Left_Menu_Click,Vive_Left_Grip_Click,ValveIndex_Left_B_Click,ValveIndex_Left_Grip_Click");
+	FString RadiusButtonKey = TEXT("Vive_Left_Menu_Click,Vive_Left_Grip_Click,ValveIndex_Left_B_Click,ValveIndex_Left_Grip_Click,OculusTouch_Left_X_Click,OculusTouch_Left_Y_Click");
 
 	/**
 	 * With the actions list open, the trackpad (the Vive) or thumbstick (the Index) scrolls a
@@ -274,11 +277,11 @@ private:
 	 * without a rebuild; -LogInput lists every registered key.
 	 */
 	UPROPERTY(Config)
-	FString MenuScrollKey = TEXT("Vive_Left_Trackpad_Y,Vive_Right_Trackpad_Y,ValveIndex_Left_Thumbstick_Y,ValveIndex_Right_Thumbstick_Y");
+	FString MenuScrollKey = TEXT("Vive_Left_Trackpad_Y,Vive_Right_Trackpad_Y,ValveIndex_Left_Thumbstick_Y,ValveIndex_Right_Thumbstick_Y,OculusTouch_Left_Thumbstick_Y,OculusTouch_Right_Thumbstick_Y");
 
 	/** The trackpad's (or thumbstick's) click, which runs the highlighted item of the actions list. -MenuSelectKey= overrides. */
 	UPROPERTY(Config)
-	FString MenuSelectKey = TEXT("Vive_Left_Trackpad_Click,Vive_Right_Trackpad_Click,ValveIndex_Left_Thumbstick_Click,ValveIndex_Right_Thumbstick_Click");
+	FString MenuSelectKey = TEXT("Vive_Left_Trackpad_Click,Vive_Right_Trackpad_Click,ValveIndex_Left_Thumbstick_Click,ValveIndex_Right_Thumbstick_Click,OculusTouch_Left_Thumbstick_Click,OculusTouch_Right_Thumbstick_Click");
 
 	/**
 	 * The view-radius dial reads only the left controller's trackpad (the Index's left thumbstick): a
@@ -287,7 +290,7 @@ private:
 	 * overrides without a rebuild.
 	 */
 	UPROPERTY(Config)
-	FString RadiusDialKey = TEXT("Vive_Left_Trackpad_Y,ValveIndex_Left_Thumbstick_Y");
+	FString RadiusDialKey = TEXT("Vive_Left_Trackpad_Y,ValveIndex_Left_Thumbstick_Y,OculusTouch_Left_Thumbstick_Y");
 
 	/** The pointing hand's ray, drawn as dots. */
 	UPROPERTY()

@@ -1035,12 +1035,13 @@ void AStarPointer::Tick(float DeltaSeconds)
 	// small to aim the ray at. Polled like the trigger; the axis and click keys are device-specific,
 	// so each candidate is tried, the largest magnitude winning. The scroll is edge-triggered with a
 	// re-arm (MenuScrollStep / MenuScrollArm), so one flick steps once.
-	// The scroll axis (trackpad or thumbstick Y), counted only from a pad that is being touched. An
-	// untouched Vive trackpad keeps reporting its last position, which would step the list or run the
-	// dial on its own, and polling both hands lets the idle pad override the one in use; the touch gate
-	// (each axis's "_Y" swapped for "_Touch") ignores a pad no thumb is on. A thumbstick springs back,
-	// but pushing it touches it too, so the gate suits both. Keys without a known touch pair are not
-	// gated, so an exotic -MenuScrollKey= override still reads.
+	// The scroll axis (trackpad or thumbstick Y), with a touch gate for trackpads only. An untouched
+	// Vive trackpad keeps reporting its last position, which would step the list or run the dial on its
+	// own, and polling both hands lets the idle pad override the one in use; the touch gate (the axis's
+	// "_Y" swapped for "_Touch") ignores a pad no thumb is on. A thumbstick needs no gate: it springs
+	// back to centre when released, so it reports nothing on its own. The gate is not applied to it
+	// because some runtimes never report a thumbstick's touch (a Vive Focus 3 streamed as a Cosmos,
+	// bound through Oculus Touch, is one), which would otherwise block the stick entirely.
 	const auto ReadScrollAxis = [&](const FString& Keys) -> float
 	{
 		TArray<FString> ScrollKeys;
@@ -1049,7 +1050,7 @@ void AStarPointer::Tick(float DeltaSeconds)
 		for (const FString& Raw : ScrollKeys)
 		{
 			const FString KeyName = Raw.TrimStartAndEnd();
-			if (KeyName.EndsWith(TEXT("_Y")))
+			if (KeyName.Contains(TEXT("Trackpad")) && KeyName.EndsWith(TEXT("_Y")))
 			{
 				const FKey Touch(*(KeyName.LeftChop(2) + TEXT("_Touch")));
 				if (Touch.IsValid() && !Player->IsInputKeyDown(Touch))

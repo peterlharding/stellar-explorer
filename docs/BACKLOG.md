@@ -125,6 +125,19 @@ Each entry says where the idea came from and which phase it most likely belongs 
   From PLH, 6 November 2026, in the Vive.
   Phase 3.
 
+## Platforms
+
+- **Stellar Explorer on the Vive Focus 3 by streaming.** The Focus 3 is a standalone headset, not the PC-driven Vive the Windows build renders to ([decisions/0013-target-platforms.md](decisions/0013-target-platforms.md) folds the Vive into the Windows x64 binary). VIVE Streaming (formerly VIVE Business Streaming) connects the Focus 3 to the Windows PC over Wi-Fi or USB and presents it to SteamVR as the active headset, so `./stellar.sh vive` renders on the PC's GPU and streams to it, with the full star budget and effects and no new build.
+  The open question is input: the controller bindings in `Config/Windows/WindowsInput.ini` are for the Vive wands and the Valve Index, and the Focus 3's controllers come up under a different OpenXR interaction profile, so the trackpad menu, the wands and the radius dial may need Focus 3 bindings added - a config change, not a rebuild.
+  From PLH, 17 November 2026.
+  Phase 3.
+  Done on 17 November 2026: the Focus 3 streams to the PC through VIVE Streaming and runs the app, controllers and all. Its controllers reach SteamVR as Vive Cosmos and bind through the Oculus Touch profile, so `OculusTouch_*` keys are bound alongside the wand and Index keys, and the thumbstick scroll and radius dial no longer gate on a touch the Focus 3 does not report. Still to try: fewer face buttons to learn (the A/B and X/Y doubling), and whether the controller/hand mode flip when a stick is idle needs damping.
+
+- **A native standalone build for the Vive Focus 3.** The app installed and run on the headset itself, with no PC in the loop: an Android arm64 OpenXR package, sideloaded with `adb`.
+  A new target beyond the three [ADR 0013](decisions/0013-target-platforms.md) fixes on (Windows x64, macOS arm64, visionOS), so it reopens that decision and wants its own ADR. The work: an Android build in Unreal (the Android SDK and NDK, the Khronos OpenXR loader or HTC's Wave), the C++ core cross-compiled for Android arm64, Focus 3 controller profiles, and a tighter budget for the Snapdragon XR2 (far less GPU than the PC - the per-platform star budget already allows for this).
+  From PLH, 17 November 2026.
+  A spike first to settle the build and performance; the target itself phase 7 or later.
+
 ## Known engine limits on Vision Pro
 
 - **Foveation, the system control, the splash window, multiview.** Each needs a change to engine code that the launcher engine ships precompiled.
